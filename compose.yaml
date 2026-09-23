@@ -1,0 +1,17 @@
+services:
+  career-quest:
+    build: .
+    init: true
+    env_file:
+      - .env
+    environment:
+      DB_PATH: /data/career_quest.sqlite
+      DATASET_ZIP: /app/career_quest_dataset.zip
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - career_quest_data:/data
+      - ./career_quest_dataset.zip:/app/career_quest_dataset.zip:ro
+
+volumes:
+  career_quest_data:

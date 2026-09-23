@@ -1,0 +1,35 @@
+# Secrets and local configuration
+.env
+.env.*
+.env.txt
+!.env.example
+*.pem
+*.key
+
+# Runtime databases, logs, and caches
+*.sqlite
+*.sqlite3
+*.db
+*.db-*
+*.log
+logs/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+coverage/
+runtime/
+.DS_Store
+
+# Organizer materials stay inside the authorized hackathon environment.
+career_quest_dataset/
+career_quest_dataset.zip
+career_quest_codex_pack.zip
+references/
+CAREER_QUEST_CODEX_PROMPT.md
