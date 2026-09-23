@@ -32,6 +32,13 @@ _locks_guard = threading.Lock()
 _locks: dict[str, threading.Lock] = {}
 _last_attempt: dict[str, float] = {}
 
+STATUS_LABELS = {
+    "completed": "завершено", "in_progress": "в работе", "planned": "запланировано",
+    "dropped": "прервано", "no_show": "неявка", "declined": "отклонено", "overdue": "просрочено",
+}
+FORMAT_LABELS = {"online": "онлайн", "offline": "очно", "self_paced": "самостоятельно"}
+GOAL_SOURCE_LABELS = {"explicit": "выбрана сотрудником", "suggested_next_grade": "предложена по следующему грейду", "current_role_development": "развитие в текущей роли"}
+
 
 def generation_lock(employee_id: str):
     with _locks_guard:
@@ -43,17 +50,28 @@ def generation_lock(employee_id: str):
 def evidence_pool(info: dict, history: list[dict]):
     pool = {}
     goal = info["goal"]
-    pool["goal"] = {"type": "goal", "label": f"Цель: {goal['role']} / {goal['grade']} ({goal['source']})", "source": "career_goal / role_profiles", "event_id": None}
+    pool["goal"] = {"type": "goal", "label": f"Цель: {goal['role']}, {goal['grade']} ({GOAL_SOURCE_LABELS.get(goal['source'], 'текущая цель')})", "source": "career_goal / role_profiles", "event_id": None}
     person = info["person"]
     pool["current_role"] = {"type": "eligibility", "label": f"Текущая роль и грейд: {person['role']} / {person['grade']}", "source": "employees.role, employees.grade", "event_id": None}
     recent = history[:12]
     counts = Counter(r["status"] for r in history)
-    pool["history_summary"] = {"type": "history", "label": "История участия: " + (", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) if counts else "записей пока нет"), "source": "activity_history.csv + app_participations", "event_id": None}
+    pool["history_summary"] = {"type": "history", "label": "История участия: " + (", ".join(f"{STATUS_LABELS.get(k, 'другой статус')}: {v}" for k, v in sorted(counts.items())) if counts else "записей пока нет"), "source": "activity_history.csv + app_participations", "event_id": None}
     for record in recent:
-        pool[f"history:{record['id']}"] = {"type": "history", "label": f"{record['event_id']}: {record['status']} ({record['date']})", "source": f"history/{record['id']}", "event_id": None}
+        pool[f"history:{record['id']}"] = {"type": "history", "label": f"«{record['title']}» ({record['date']}): {STATUS_LABELS.get(record['status'], 'статус не указан')}", "source": f"history/{record['id']}", "event_id": None}
     for candidate in info["candidates"]:
         event_id = candidate["event_id"]
-        pool[f"format:{event_id}"] = {"type": "format", "label": f"{candidate['format']}, {candidate['duration_hours']} ч; {candidate['session_date'] or 'в своём темпе'}", "source": f"events/{event_id}", "event_id": event_id}
+        pool[f"format:{event_id}"] = {"type": "format", "label": f"{FORMAT_LABELS.get(candidate['format'], 'Формат уточняется')}, {candidate['duration_hours']} ч; {candidate['session_date'] or 'в своём темпе'}", "source": f"events/{event_id}", "event_id": event_id}
+        related_skills = {change["skill_id"] for change in candidate["develops"]}
+        related_history = [record for record in history if record["event_id"] == event_id or related_skills.intersection(record.get("skill_ids", []))]
+        completed = next((record for record in related_history if record["status"] == "completed"), None)
+        if completed:
+            history_label = f"По связанным навыкам ранее завершено «{completed['title']}» ({completed['date']})."
+        elif related_history:
+            record = related_history[0]
+            history_label = f"По связанным навыкам есть запись «{record['title']}» ({record['date']}): {STATUS_LABELS.get(record['status'], 'статус не указан')}; завершений пока нет."
+        else:
+            history_label = "По навыкам этого шага в истории пока нет записей об участии."
+        pool[f"history_context:{event_id}"] = {"type": "history", "label": history_label, "source": "activity_history.csv + app_participations", "event_id": event_id}
         action_label = "Уже запланированная сессия" if candidate.get("participation_status") == "planned" else ("Продолжение начатого обучения" if candidate["action"] == "continue" else "Доступное добровольное мероприятие")
         pool[f"action:{event_id}"] = {"type": "action", "label": action_label, "source": f"eligibility/{event_id}", "event_id": event_id}
         for change in candidate["develops"]:
@@ -80,7 +98,7 @@ def _fallback_choices(info: dict, pool: dict):
         critical = sum(max(0, min(d["after"], d["required"]) - min(d["current"], d["required"])) for d in candidate["develops"] if d["critical"])
         gain = sum(max(0, min(d["after"], d["required"]) - min(d["current"], d["required"])) for d in candidate["develops"])
         return (-critical, -gain, candidate["action"] != "continue", candidate["duration_hours"], candidate["event_id"])
-    return [(candidate, ["goal", f"gap:{candidate['event_id']}:{candidate['develops'][0]['skill_id']}", "history_summary", f"effect:{candidate['event_id']}:{candidate['develops'][0]['skill_id']}", f"format:{candidate['event_id']}"]) for candidate in sorted(info["candidates"], key=rank)[:3]]
+    return [(candidate, ["goal", f"gap:{candidate['event_id']}:{candidate['develops'][0]['skill_id']}", f"history_context:{candidate['event_id']}", f"effect:{candidate['event_id']}:{candidate['develops'][0]['skill_id']}", f"format:{candidate['event_id']}"]) for candidate in sorted(info["candidates"], key=rank)[:3]]
 
 
 def _validate_selection(selection: ModelSelection, info: dict, pool: dict):
@@ -99,32 +117,41 @@ def _validate_selection(selection: ModelSelection, info: dict, pool: dict):
         if len(item.evidence_ids) < 3:
             raise ValueError("Too little evidence")
         facts = []
-        for evidence_id in dict.fromkeys(item.evidence_ids):
+        ids = list(dict.fromkeys(item.evidence_ids))
+        for evidence_id in ids:
             fact = pool.get(evidence_id)
             if not fact or fact["event_id"] not in (None, item.event_id):
                 raise ValueError("Unknown or unrelated evidence_id")
             facts.append(fact)
+        history_id = f"history_context:{item.event_id}"
+        if history_id in pool and history_id not in ids:
+            ids.append(history_id)
+            facts.append(pool[history_id])
         types = {f["type"] for f in facts}
-        if len(types) < 3 or not {"gap", "history"}.issubset(types) or not types.intersection({"goal", "eligibility"}):
+        if not {"goal", "gap", "history"}.issubset(types):
             raise ValueError("Evidence does not cover three factors")
-        choices.append((candidate, list(dict.fromkeys(item.evidence_ids))))
+        choices.append((candidate, ids))
     return choices
 
 
-def _render(choices: list[tuple[dict, list[str]]], pool: dict, source: str):
+def _render(choices: list[tuple[dict, list[str]]], pool: dict, source: str, goal: dict):
     result = []
     for candidate, ids in choices:
         facts = [{"id": evidence_id, "label": pool[evidence_id]["label"], "source": pool[evidence_id]["source"]} for evidence_id in ids]
-        # Render factual explanation from verified evidence; free model prose is never displayed.
-        priority = {"goal": 0, "eligibility": 0, "gap": 1, "history": 2, "effect": 3, "format": 4, "action": 5}
-        visible_ids = sorted(ids, key=lambda evidence_id: priority[pool[evidence_id]["type"]])
-        chosen_types, visible = set(), []
-        for evidence_id in visible_ids:
-            fact_type = pool[evidence_id]["type"]
-            if fact_type not in chosen_types:
-                chosen_types.add(fact_type)
-                visible.append(pool[evidence_id]["label"])
-        rationale = "; ".join(visible[:5]) + "."
+        # The model selects events and evidence; the final prose uses only verified facts.
+        develops = candidate["develops"]
+        names = " и ".join(f"«{change['name']}»" for change in develops[:2])
+        if len(develops) > 2:
+            names += " и другие навыки"
+        leading = develops[0]
+        rationale = f"Этот шаг поможет развить {names} и приблизиться к требованиям уровня {goal['grade']}. "
+        if leading["after"] > leading["current"]:
+            rationale += f"После завершения ожидается рост навыка «{leading['name']}» с {leading['current']} до {leading['after']} при цели {leading['required']}. "
+        else:
+            rationale += f"По текущему расчёту уровень навыка «{leading['name']}» остаётся {leading['current']} при цели {leading['required']}. "
+        if leading["critical"]:
+            rationale += "Этот навык критичен для выбранной цели. "
+        rationale += pool[f"history_context:{candidate['event_id']}"]["label"]
         result.append({**candidate, "factors": facts, "rationale": rationale, "tradeoff": "Прирост расчётный; окончательное решение об участии остаётся за сотрудником."})
     return result
 
@@ -186,7 +213,7 @@ def generate(conn: sqlite3.Connection, employee_id: str, force: bool = False):
             except Exception:
                 choices = _fallback_choices(info, pool)
                 source, status = "fallback", "fallback"
-        result = _render(choices, pool, source)
+        result = _render(choices, pool, source, info["goal"])
         calculated_at = utc_now()
         with transaction(conn):
             if recommendation_version(conn, employee_id) != before:

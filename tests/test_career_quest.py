@@ -117,6 +117,35 @@ def _import_person(conn, person: dict, *rows: dict):
     return commit_import(conn, plan)
 
 
+def test_ai_missing_history_evidence_gets_verified_human_context(client: TestClient):
+    with db.connection() as conn:
+        info = domain.candidate_info(conn, "E0005")
+        history = domain.history_for(conn, "E0005", info["events"])
+        pool = recommendations.evidence_pool(info, history)
+    candidate = info["candidates"][0]
+    change = candidate["develops"][0]
+    event_id = candidate["event_id"]
+    selection = recommendations.ModelSelection(
+        recommendations=[recommendations.ModelChoice(
+            event_id=event_id,
+            action=candidate["action"],
+            rationale="Model text is not displayed",
+            evidence_ids=["goal", f"gap:{event_id}:{change['skill_id']}", f"effect:{event_id}:{change['skill_id']}", f"format:{event_id}"],
+            tradeoff=None,
+        )],
+        limitations=[],
+    )
+    choices = recommendations._validate_selection(selection, info, pool)
+    assert f"history_context:{event_id}" in choices[0][1]
+    item = recommendations._render(choices, pool, "ai", info["goal"])[0]
+    assert "Этот шаг поможет развить" in item["rationale"]
+    assert "при цели" in item["rationale"]
+    assert "По связанным навыкам" in item["rationale"] or "пока нет записей" in item["rationale"]
+    assert "Model text" not in item["rationale"]
+    assert len(item["factors"]) >= 3
+    assert all(code not in item["rationale"] + " ".join(fact["label"] for fact in item["factors"]) for code in ("explicit", "completed", "declined", "self_paced"))
+
+
 def test_seed_and_real_e0005_regression(client: TestClient):
     with db.connection() as conn:
         assert conn.execute("SELECT COUNT(*) FROM employees").fetchone()[0] == 200

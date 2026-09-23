@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from './api'
 import type { ImportPreview } from './types'
-import { errorText } from './ui'
+import { dateLabel, errorText } from './ui'
 
 type ImportResult = {
   affected_employees?: string[]
@@ -110,7 +110,7 @@ function ImportForm() {
       {preview.errors.length > 0 ? <div className="alert error"><b>Ошибки ({preview.errors.length})</b><ul>{preview.errors.map((item, index) => <li key={index}>{readableIssue(item)}</li>)}</ul></div> : <div className="alert success">Проверка пройдена. Импорт будет выполнен одной транзакцией после подтверждения.</div>}
       {!!preview.warnings?.length && <div className="alert warning"><b>Предупреждения ({preview.warnings.length})</b><ul>{preview.warnings.map((item, index) => <li key={index}>{readableIssue(item)}</li>)}</ul></div>}
       {preview.updated_employees > 0 && <label className="check-label"><input type="checkbox" checked={confirmUpdates} onChange={event => setConfirmUpdates(event.target.checked)} /> Подтверждаю обновление {preview.updated_employees} существующих профилей</label>}
-      {!!preview.same_day_completions?.length && <div className="same-day-box"><strong>Завершения в день новой оценки: {preview.same_day_completions.length}</strong><p className="hint">Укажите, учтены ли эти завершения в загружаемых уровнях навыков. Если нет, приложение сохранит их прирост при пересчёте.</p><ul>{preview.same_day_completions.map(item => <li key={item.id}>{item.employee_id} · {item.event_id} · {item.completion_date} <small>{item.id}</small></li>)}</ul><label className="check-label"><input type="checkbox" checked={coverSameDayCompletions} onChange={event => setCoverSameDayCompletions(event.target.checked)} /> Новая оценка уже включает эти завершения в день оценки</label></div>}
+      {!!preview.same_day_completions?.length && <div className="same-day-box"><strong>Завершения в день новой оценки: {preview.same_day_completions.length}</strong><p className="hint">Укажите, учтены ли эти завершения в загружаемых уровнях навыков. Если нет, приложение сохранит их прирост при пересчёте.</p><ul>{preview.same_day_completions.map(item => <li key={item.id}>Сотрудник {item.employee_id} · завершение {dateLabel(item.completion_date)}</li>)}</ul><label className="check-label"><input type="checkbox" checked={coverSameDayCompletions} onChange={event => setCoverSameDayCompletions(event.target.checked)} /> Новая оценка уже включает эти завершения в день оценки</label></div>}
       <div className="import-confirm"><span className="eyebrow">ШАГ 3</span><h2>Подтвердите импорт</h2><p className="hint">После подтверждения изменения сохранятся. Неисправленные ошибки и неподтверждённые обновления блокируют запись.</p><button className="button primary" disabled={busy || preview.ok === false || preview.errors.length > 0 || (preview.updated_employees > 0 && !confirmUpdates)} onClick={() => void commit()}>{busy ? 'Импортируем…' : 'Подтвердить импорт'}</button></div>
     </div>}
   </section>
@@ -119,7 +119,7 @@ function ImportForm() {
 export default function HrImport() {
   return <div className="hr-import-page">
     <section className="page-title"><div><span className="eyebrow">HR · ИМПОРТ</span><h1>Импорт профилей и истории</h1><p>Загрузите дополнительные данные в исходном формате датасета, проверьте изменения и подтвердите сохранение.</p></div><Link className="button subtle" to="/hr/competencies">К компетенциям</Link></section>
-    <section className="panel import-guide"><h2>Поддерживаемые форматы</h2><div className="import-guide-grid"><div><strong>employees.json</strong><p>JSON объект с полями <code>meta</code> и <code>employees</code>. Подходят дополнительные профили и обновления существующих сотрудников.</p></div><div><strong>activity_history.csv</strong><p>CSV с исходными колонками <code>record_id, employee_id, event_id, date, due_date, status, completion_pct, score, feedback_rating, assigned_by</code>.</p></div></div><p className="hint">ID сотрудников и мероприятий проверяются по уже загруженным данным. Точные дубли не записываются повторно; ошибки показываются до подтверждения.</p></section>
+    <section className="panel import-guide"><h2>Поддерживаемые форматы</h2><div className="import-guide-grid"><div><strong>employees.json</strong><p>Файл профилей из набора данных: подходят дополнительные сотрудники и обновления существующих профилей.</p></div><div><strong>activity_history.csv</strong><p>Файл истории участия из набора данных: завершения, назначения и другие записи активности.</p></div></div><p className="hint">Связи с уже загруженными сотрудниками и мероприятиями проверяются до сохранения. Точные дубли не записываются повторно; ошибки показываются до подтверждения.</p></section>
     <ImportForm />
   </div>
 }
