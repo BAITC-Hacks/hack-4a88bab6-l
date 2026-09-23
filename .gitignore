@@ -31,3 +31,10 @@ runtime/
 career_quest_codex_pack.zip
 references/
 CAREER_QUEST_CODEX_PROMPT.md
+
+# Standalone ayko SQLite sidecars
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3-shm
+*.sqlite3-wal
+.venv-*/
