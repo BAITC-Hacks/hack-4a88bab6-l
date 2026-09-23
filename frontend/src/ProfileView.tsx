@@ -20,8 +20,12 @@ const exclusionLabels: Record<string, string> = {
 
 type Mode = 'employee' | 'hr'
 type Tab = 'recommended' | 'chosen' | 'completed' | 'skipped' | 'archived'
+export type JournalFilter = 'all' | 'attended' | 'skipped'
+export type JournalRow =
+  | { kind: 'activity'; key: string; date: string; entry: History }
+  | { kind: 'skip'; key: string; date: string; entry: Profile['skips'][number] }
 
-function SkillChart({ title, type, skills, color }: { title: string; type: 'soft' | 'hard'; skills: Skill[]; color: string }) {
+export function SkillChart({ title, type, skills, color }: { title: string; type: 'soft' | 'hard'; skills: Skill[]; color: string }) {
   const values = useMemo(() => skills.filter(s => s.type === type && s.required > 0)
     .sort((a, b) => Number(b.critical) - Number(a.critical) || b.gap - a.gap || b.required - a.required)
     .slice(0, 8), [skills, type])
@@ -43,7 +47,7 @@ function SkillChart({ title, type, skills, color }: { title: string; type: 'soft
   </section>
 }
 
-function DynamicsChart({ profile }: { profile: Profile }) {
+export function DynamicsChart({ profile }: { profile: Profile }) {
   const keys = profile.skills.filter(s => s.required > 0).sort((a, b) => Number(b.critical) - Number(a.critical) || b.gap - a.gap).slice(0, 4)
   const data = profile.dynamics.map(point => ({ date: dateLabel(point.date), ...point.skills }))
   const colors = ['#137b6a', '#406fe2', '#df9a47', '#9a65c8']
@@ -60,7 +64,7 @@ function DynamicsChart({ profile }: { profile: Profile }) {
   </section>
 }
 
-function ActivityChart({ rows }: { rows: History[] }) {
+export function ActivityChart({ rows }: { rows: History[] }) {
   const data = useMemo(() => {
     const months = new Map<string, { month: string; completed: number; active: number; other: number }>()
     for (const item of rows) {
@@ -109,6 +113,32 @@ function ActivityHeatmap({ calendar }: { calendar: NonNullable<Profile['activity
   </section>
 }
 
+export function JournalSection({ rows, filter, onFilter, from, onFrom, to, onTo, expanded, onExpanded }: {
+  rows: JournalRow[]
+  filter: JournalFilter
+  onFilter: (value: JournalFilter) => void
+  from: string
+  onFrom: (value: string) => void
+  to: string
+  onTo: (value: string) => void
+  expanded: boolean
+  onExpanded: (value: boolean) => void
+}) {
+  const attendedCount = rows.filter(row => row.kind === 'activity' && row.entry.status === 'completed').length
+  const skippedCount = rows.filter(row => row.kind === 'skip').length
+  const visible = rows.filter(row => filter === 'all' || (filter === 'attended' ? row.kind === 'activity' && row.entry.status === 'completed' : row.kind === 'skip'))
+  return <section className="panel history-section">
+    <div className="section-heading"><div><span className="eyebrow">ЖУРНАЛ</span><h2>История участия</h2></div><span className="muted">{rows.length} событий за период</span></div>
+    <div className="filters"><label>С<input type="date" value={from} onChange={event => { onFrom(event.target.value); onExpanded(false) }} /></label><label>По<input type="date" value={to} onChange={event => { onTo(event.target.value); onExpanded(false) }} /></label>{(from || to) && <button className="text-button" onClick={() => { onFrom(''); onTo(''); onExpanded(false) }}>Сбросить период</button>}</div>
+    <div className="tabs history-tabs" role="tablist" aria-label="Фильтр истории участия">
+      {([['all', 'Все', rows.length], ['attended', 'Attended · Завершено', attendedCount], ['skipped', 'Skipped · Пропущено', skippedCount]] as [JournalFilter, string, number][]).map(([value, label, count]) => <button key={value} type="button" role="tab" aria-selected={filter === value} className={filter === value ? 'active' : ''} onClick={() => { onFilter(value); onExpanded(false) }}>{label} <span>{count}</span></button>)}
+    </div>
+    <div className="table-wrap"><table><thead><tr><th>Активность</th><th>Дата записи</th><th>Статус</th><th>Прогресс</th><th>Источник</th></tr></thead><tbody>{visible.slice(0, expanded ? undefined : 12).map(row => row.kind === 'activity' ? <tr key={row.key}><td><b>{row.entry.title}</b><small className="muted block">{row.entry.event_id}{row.entry.mandatory ? ' · обязательное' : ''}{row.entry.is_simulated ? ' · смоделировано' : ''}</small></td><td>{dateLabel(row.entry.date)}{row.entry.date_meaning === 'enrollment_or_assignment' && <small className="muted block">дата зачисления</small>}</td><td><span className={`status ${row.entry.status}`}>{row.entry.status === 'completed' ? 'Attended · Завершено' : statusLabels[row.entry.status] || row.entry.status}</span></td><td>{row.entry.completion_pct}%</td><td>{row.entry.source === 'imported' ? 'Исходный журнал' : 'В приложении'}</td></tr> : <tr key={row.key}><td><b>{row.entry.title || row.entry.event_id}</b><small className="muted block">{row.entry.event_id} · {row.entry.reason || 'Причина не указана'}</small></td><td>{dateLabel(row.date)}<small className="muted block">дата выбора</small></td><td><span className="status skipped">Skipped · Пропущено</span></td><td>—</td><td>Выбор сотрудника</td></tr>)}</tbody></table>{!visible.length && <div className="empty">{filter === 'skipped' ? 'Активных добровольных пропусков за выбранный период нет.' : filter === 'attended' ? 'Завершённых активностей за выбранный период нет.' : 'Событий за выбранный период нет.'}</div>}</div>
+    {visible.length > 12 && <button className="text-button" onClick={() => onExpanded(!expanded)}>{expanded ? 'Свернуть' : `Показать все ${visible.length}`}</button>}
+    <p className="hint">Skip — добровольный выбор без штрафа и без изменения навыков. Исторические no_show и declined остаются отдельными статусами участия. Для self-paced мероприятий дата исходной записи может означать зачисление, а не точный день завершения.</p>
+  </section>
+}
+
 export default function ProfileView({ mode, employeeId }: { mode: Mode; employeeId?: string }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [recs, setRecs] = useState<RecSet | null>(null)
@@ -117,7 +147,9 @@ export default function ProfileView({ mode, employeeId }: { mode: Mode; employee
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState('')
   const [tab, setTab] = useState<Tab>('recommended')
+  const [pageTab, setPageTab] = useState<'plan' | 'skills' | 'history'>('plan')
   const [expandedHistory, setExpandedHistory] = useState(false)
+  const [journalFilter, setJournalFilter] = useState<JournalFilter>('all')
   const [historyFrom, setHistoryFrom] = useState('')
   const [historyTo, setHistoryTo] = useState('')
   const [editGoal, setEditGoal] = useState(false)
@@ -166,6 +198,14 @@ export default function ProfileView({ mode, employeeId }: { mode: Mode; employee
   const availableGrades = [...new Set(profiles.filter(p => p.role === goalRole).map(p => p.grade))]
   const filteredHistory = (profile?.history ?? []).filter(item => (!historyFrom || item.date >= historyFrom) && (!historyTo || item.date <= historyTo))
     .sort((a, b) => b.date.localeCompare(a.date))
+  const filteredSkips = (profile?.skips ?? []).filter(item => {
+    const date = (item.created_at || item.updated_at || '').slice(0, 10)
+    return (!historyFrom || date >= historyFrom) && (!historyTo || date <= historyTo)
+  })
+  const journalRows: JournalRow[] = [
+    ...filteredHistory.map(item => ({ kind: 'activity' as const, key: `activity:${item.id}`, date: item.date, entry: item })),
+    ...filteredSkips.map(item => ({ kind: 'skip' as const, key: `skip:${item.event_id}`, date: (item.created_at || item.updated_at || '').slice(0, 10), entry: item })),
+  ].sort((a, b) => b.date.localeCompare(a.date) || a.key.localeCompare(b.key))
   const completed = filteredHistory.filter(item => item.status === 'completed')
   const active = [
     ...(profile?.participations ?? []).filter(item => ['in_progress', 'planned'].includes(item.status)),
@@ -183,14 +223,15 @@ export default function ProfileView({ mode, employeeId }: { mode: Mode; employee
   if (loading && !profile) return <div className="panel loading-panel">Загружаем профиль…</div>
   if (!profile) return <div className="panel"><p className="error">{error || 'Профиль недоступен.'}</p><button className="button" onClick={() => void load()}>Повторить</button></div>
 
-  return <div className="profile-view">
+  return <div className="profile-view employee-dashboard">
     <section className="profile-hero panel">
       <div>
-        <span className="eyebrow">{mode === 'hr' ? 'ПРОФИЛЬ СОТРУДНИКА' : 'ЛИЧНЫЙ КАБИНЕТ'}</span>
-        <h1>{profile.employee.full_name}</h1>
-        <div className="hero-meta"><span>{profile.employee.employee_id}</span><span>{profile.employee.department}</span><span>{profile.employee.role} · {profile.employee.grade}</span></div>
+        <span className="eyebrow">ЛИЧНЫЙ КАБИНЕТ · СОТРУДНИК</span>
+        <h1>Мой план развития</h1>
+        <p className="employee-greeting">{profile.employee.full_name}, выбирайте шаги к своей карьерной цели.</p>
+        <div className="hero-meta"><span>{profile.employee.role} · {profile.employee.grade}</span><span>{profile.employee.department}</span></div>
       </div>
-      <div className="hero-goal"><span className="eyebrow">КАРЬЕРНАЯ ТРАЕКТОРИЯ</span><strong>{profile.goal.role} · {profile.goal.grade}</strong><small>{goalSourceLabels[profile.goal.source] || profile.goal.source}</small>
+      <div className="hero-goal"><span className="eyebrow">КАРЬЕРНАЯ ТРАЕКТОРИЯ</span><strong>{profile.goal.role} · {profile.goal.grade}</strong><small>{goalSourceLabels[profile.goal.source] || profile.goal.source}</small>{profile.coverage_pct != null && <div className="goal-progress"><div className="bar-track"><span style={{ width: `${profile.coverage_pct}%`, background: '#117d70' }} /></div><small>{numberLabel(profile.coverage_pct, 0)}% требований цели покрыто</small></div>}
         {mode === 'employee' && <button className="text-button" onClick={() => setEditGoal(!editGoal)}>{editGoal ? 'Отмена' : 'Подтвердить или изменить цель'}</button>}
       </div>
     </section>
@@ -207,33 +248,23 @@ export default function ProfileView({ mode, employeeId }: { mode: Mode; employee
     {error && <div className="alert error" role="alert">{error}<button onClick={() => setError('')} aria-label="Закрыть">×</button></div>}
     {notice && <div className="alert success" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Закрыть">×</button></div>}
 
-    <div className="stats-grid">
-      <div className="panel metric"><span>Покрытие требований цели</span><strong>{profile.coverage_pct == null ? '—' : `${numberLabel(profile.coverage_pct, 1)}%`}</strong><small>{profile.coverage_pct == null ? 'Недостаточно требований для расчёта' : 'Расчёт по требуемым навыкам, не вероятность повышения'}</small></div>
-      <div className="panel metric"><span>Незакрытые критические навыки</span><strong>{profile.critical_gaps}</strong><small>По требованиям выбранной цели</small></div>
-      <div className="panel metric"><span>Последняя оценка</span><strong className="date-metric">{dateLabel(profile.employee.last_review_date)}</strong><small>Исходная точка расчётной динамики</small></div>
-    </div>
-
-    <div className="two-col"><SkillChart title="Гибкие навыки" type="soft" skills={profile.skills} color="#8965c7" /><SkillChart title="Профессиональные навыки" type="hard" skills={profile.skills} color="#137b6a" /></div>
-    <details className="panel details-panel"><summary>Все навыки выбранной цели <span className="muted">{profile.skills.filter(s => s.required > 0).length}</span></summary>
-      <div className="table-wrap"><table><thead><tr><th>Навык</th><th>Тип</th><th>Сейчас</th><th>Требуется</th><th>Разрыв</th><th>Критический</th></tr></thead><tbody>{profile.skills.filter(s => s.required > 0).sort((a,b) => b.gap - a.gap).map(s => <tr key={s.skill_id}><td><b>{s.name}</b><small className="muted block">{s.skill_id}</small></td><td>{s.type === 'hard' ? 'Hard' : 'Soft'}</td><td>{s.current}</td><td>{s.required}</td><td><span className={s.gap ? 'gap' : 'ok'}>{s.gap}</span></td><td>{s.critical ? 'Да' : '—'}</td></tr>)}</tbody></table></div>
-    </details>
-
-    <div className="two-col"><DynamicsChart profile={profile} /><ActivityChart rows={filteredHistory} /></div>
-    {mode === 'employee' && profile.activity_calendar && <ActivityHeatmap calendar={profile.activity_calendar} />}
-
+    <nav className="workspace-tabs" aria-label="Разделы личного кабинета">
+      {([['plan', 'Мой план'], ['skills', 'Навыки'], ['history', 'История']] as const).map(([value, label]) => <button key={value} className={pageTab === value ? 'active' : ''} aria-current={pageTab === value ? 'page' : undefined} onClick={() => setPageTab(value)}>{label}</button>)}
+    </nav>
+    {pageTab === 'plan' && <>
     <section className="panel recommendation-section" id="recommendations">
-      <div className="section-heading"><div><span className="eyebrow">СЛЕДУЮЩИЕ ШАГИ</span><h2>Рекомендации и участие</h2></div>
-        <button className="button primary" disabled={!!busy} onClick={() => void act('generate', async () => { const result = mode === 'hr' ? await api.generateHrRecommendations(employeeId!) : await api.generateEmployeeRecommendations(); setRecs(result) }, 'Подбор обновлён.')}>{busy === 'generate' ? 'Подбираем…' : mode === 'hr' ? 'Пересчитать' : 'Подобрать шаги'}</button></div>
+      <div className="section-heading"><div><span className="eyebrow">ВЫБИРАЮ СЛЕДУЮЩИЙ ШАГ</span><h2>Мои активности</h2><p className="hint">Подберите 1–3 подходящих шага, начните обучение или пропустите предложение без штрафа.</p></div>
+        <button className="button primary" disabled={!!busy} onClick={() => void act('generate', async () => { const result = mode === 'hr' ? await api.generateHrRecommendations(employeeId!) : await api.generateEmployeeRecommendations(); setRecs(result) }, 'Подбор обновлён.')}>{busy === 'generate' ? 'AI подбирает шаги…' : 'Подобрать с AI'}</button></div>
       <div className="recommendation-meta"><span className={`badge ${recs?.source === 'fallback' ? 'warning' : 'positive'}`}>{recSource}</span><span>{recs?.calculated_at ? `Обновлено ${dateTimeLabel(recs.calculated_at)}` : 'Пока не запрошено'}</span><span className="muted">{({ stale: 'Данные изменились', not_requested: 'Ещё не запрошено', no_candidates: 'Нет допустимых кандидатов', fallback: 'Резервный режим' } as Record<string, string>)[recStatus] || ''}</span></div>
       <div className="tabs" role="tablist" aria-label="Состояние активностей">
         {([['recommended', 'Рекомендовано', recommendations.length], ['chosen', 'Выбрано / в работе', active.length], ['completed', 'Выполнено', completed.length], ['skipped', 'Пропущено', profile.skips.length], ['archived', 'Архив HR', profile.archives.length]] as [Tab, string, number][]).map(([id, label, count]) => <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label} <span>{count}</span></button>)}
       </div>
 
       {tab === 'recommended' && <div className="card-list">{recommendations.length ? recommendations.map(item => <article className="recommendation-card" key={item.event_id}>
-        <div className="rec-top"><div><span className="eyebrow">{item.event_id} · {item.type}</span><h3>{item.title}</h3></div><span className="badge">{item.participation_status === 'planned' ? 'Запланировано' : item.action === 'continue' ? 'Продолжить' : 'Новый шаг'}</span></div>
+        <div className="rec-top"><div><span className="eyebrow">РЕКОМЕНДОВАННЫЙ ШАГ</span><h3>{item.title}</h3></div><span className="badge">{item.participation_status === 'planned' ? 'Запланировано' : item.action === 'continue' ? 'Продолжить' : 'Новый шаг'}</span></div>
         <div className="tags"><span>{formatLabels[item.format] || item.format}</span><span>{numberLabel(item.duration_hours, 1)} ч</span><span>{item.format === 'self_paced' ? 'В своём темпе' : item.session_date ? `Сессия ${dateLabel(item.session_date)}` : 'Дата уточняется'}</span></div>
         {item.develops.length > 0 && <div className="gains">{item.develops.map(s => <span key={s.skill_id}>{s.name}: <b>{s.current} → {s.after}</b>{s.required > 0 && <small> цель {s.required}</small>}</span>)}</div>}
-        <p>{item.rationale}</p>{item.tradeoff && <p className="tradeoff"><b>Ограничение выбора:</b> {item.tradeoff}</p>}
+        <div className="rec-reason"><h4>Почему этот шаг подходит</h4><p>{item.rationale}</p></div>{item.tradeoff && <p className="tradeoff"><b>Ограничение выбора:</b> {item.tradeoff}</p>}
         <details className="fact-details"><summary>Факты и источники обоснования ({item.factors.length})</summary><ul>{item.factors.map(f => <li key={f.id}>{f.label} <small>{f.source}</small></li>)}</ul></details>
         <div className="rec-actions">{mode === 'employee' ? <>
           {item.action === 'start' && <button className="button primary" disabled={!!busy} onClick={() => void act(`start-${item.event_id}`, () => api.start(item.event_id, item.session_date), item.session_date ? 'Участие запланировано.' : 'Участие начато.', 'chosen')}>{busy === `start-${item.event_id}` ? 'Сохраняем…' : item.session_date ? 'Запланировать' : 'Начать'}</button>}
@@ -242,7 +273,7 @@ export default function ProfileView({ mode, employeeId }: { mode: Mode; employee
         </> : <>
           {item.action === 'continue' ? <span className="muted">Участие уже начато; его статус меняет только сотрудник.</span> : archiveFor === item.event_id ? <div className="archive-form"><label>Причина архивирования<input value={archiveReason} onChange={e => setArchiveReason(e.target.value)} maxLength={500} placeholder="Укажите причину для сотрудника" /></label><button className="button danger" disabled={!archiveReason.trim() || !!busy} onClick={() => void act(`archive-${item.event_id}`, () => api.archive(employeeId!, item.event_id, archiveReason.trim()), 'Предложение убрано из активных и сохранено в архиве.', 'archived').then(ok => { if (ok) { setArchiveFor(''); setArchiveReason('') } })}>Сохранить</button><button className="button subtle" onClick={() => setArchiveFor('')}>Отмена</button></div> : <button className="button subtle" onClick={() => { setArchiveFor(item.event_id); setArchiveReason('') }}>Убрать рекомендацию</button>}
         </>}</div>
-      </article>) : <div className="empty"><h3>Активных рекомендаций нет</h3><p>{recStatus === 'not_requested' ? 'Подбор ещё не запрошен. Нажмите «Подобрать шаги».' : recStatus === 'stale' ? 'Данные изменились. Обновите подбор, чтобы получить актуальные предложения.' : recStatus === 'error' ? 'Не удалось получить подбор. Повторите запрос.' : profile.availability?.state === 'requirements_covered' ? 'Требования цели уже покрыты. Повышение грейда не происходит автоматически.' : recStatus === 'no_candidates' ? availabilityLabels[profile.availability?.state || ''] || 'Сейчас нет допустимых добровольных шагов.' : 'Обновите подбор для проверки доступных шагов.'}</p>{candidateCount != null && <p className="candidate-count">Допустимых кандидатов по каталогу: <b>{candidateCount}</b></p>}{recStatus === 'no_candidates' && excluded.length > 0 && <div className="exclusion-summary"><strong>Причины исключения из подбора</strong><ul>{excluded.map(([reason, count]) => <li key={reason}>{exclusionLabels[reason] || reason}: {count}</li>)}</ul></div>}</div>}</div>}
+      </article>) : <div className="empty"><h3>Активных рекомендаций нет</h3><p>{recStatus === 'not_requested' ? 'Подбор ещё не запрошен. Нажмите «Подобрать с AI»: учтём вашу цель, разрывы и историю участия.' : recStatus === 'stale' ? 'Данные изменились. Обновите подбор, чтобы получить актуальные предложения.' : recStatus === 'error' ? 'Не удалось получить подбор. Повторите запрос.' : profile.availability?.state === 'requirements_covered' ? 'Требования цели уже покрыты. Повышение грейда не происходит автоматически.' : recStatus === 'no_candidates' ? availabilityLabels[profile.availability?.state || ''] || 'Сейчас нет допустимых добровольных шагов.' : 'Обновите подбор для проверки доступных шагов.'}</p>{candidateCount != null && <p className="candidate-count">Допустимых кандидатов по каталогу: <b>{candidateCount}</b></p>}{recStatus === 'no_candidates' && excluded.length > 0 && <div className="exclusion-summary"><strong>Причины исключения из подбора</strong><ul>{excluded.map(([reason, count]) => <li key={reason}>{exclusionLabels[reason] || reason}: {count}</li>)}</ul></div>}</div>}</div>}
 
       {tab === 'chosen' && <div className="card-list">{active.length ? active.map(item => <article className="participation-card" key={item.id}><div><span className="eyebrow">{item.event_id} · {statusLabels[item.status] || item.status}</span><h3>{item.title}</h3><p className="muted">{item.session_date ? `Сессия ${dateLabel(item.session_date)}` : 'В своём темпе'}{item.is_simulated ? ' · учебная демонстрация' : ''}</p></div>{mode === 'employee' && <div className="rec-actions">{(profile.demo_mode || !item.session_date || item.session_date <= profile.as_of_date) && <button className="button primary" disabled={!!busy} onClick={() => void act(`complete-${item.id}`, () => api.complete(item.id, Boolean(profile.demo_mode && item.session_date && item.session_date > profile.as_of_date)), 'Выполнение сохранено; навыки пересчитаны.', 'completed')}>{profile.demo_mode && item.session_date && item.session_date > profile.as_of_date ? 'Смоделировать выполнение' : 'Отметить выполненной'}</button>}<button className="button subtle" disabled={!!busy} onClick={() => void act(`stop-${item.id}`, () => api.stop(item.id), 'Участие прекращено и сохранено в истории.')}>Прекратить участие</button></div>}</article>) : <div className="empty">Пока нет выбранных или начатых активностей.</div>}</div>}
 
@@ -253,12 +284,20 @@ export default function ProfileView({ mode, employeeId }: { mode: Mode; employee
       {tab === 'archived' && <div className="card-list">{profile.archives.length ? profile.archives.map(item => <article className="compact-card" key={item.event_id}><div><strong>{item.title || item.event_id}</strong><small>{item.event_id} · Причина HR: {item.reason}</small></div>{mode === 'hr' && <button className="button subtle" disabled={!!busy} onClick={() => void act(`unarchive-${item.event_id}`, () => api.restoreArchive(employeeId!, item.event_id), 'Архив восстановлен. Пропуск сотрудника, если он был, остаётся.', 'recommended')}>Восстановить</button>}</article>) : <div className="empty">Архивных предложений нет.</div>}</div>}
     </section>
 
-    <section className="panel history-section"><div className="section-heading"><div><span className="eyebrow">ЖУРНАЛ</span><h2>История участия</h2></div><span className="muted">{filteredHistory.length} записей</span></div>
-      <div className="filters"><label>С<input type="date" value={historyFrom} onChange={e => setHistoryFrom(e.target.value)} /></label><label>По<input type="date" value={historyTo} onChange={e => setHistoryTo(e.target.value)} /></label>{(historyFrom || historyTo) && <button className="text-button" onClick={() => { setHistoryFrom(''); setHistoryTo('') }}>Сбросить период</button>}</div>
-      <div className="table-wrap"><table><thead><tr><th>Активность</th><th>Дата записи</th><th>Статус</th><th>Прогресс</th><th>Источник</th></tr></thead><tbody>{filteredHistory.slice(0, expandedHistory ? undefined : 12).map(item => <tr key={item.id}><td><b>{item.title}</b><small className="muted block">{item.event_id}{item.mandatory ? ' · обязательное' : ''}{item.is_simulated ? ' · смоделировано' : ''}</small></td><td>{dateLabel(item.date)}{item.date_meaning === 'enrollment_or_assignment' && <small className="muted block">дата зачисления</small>}</td><td><span className={`status ${item.status}`}>{statusLabels[item.status] || item.status}</span></td><td>{item.completion_pct}%</td><td>{item.source === 'imported' ? 'Исходный журнал' : 'В приложении'}</td></tr>)}</tbody></table>{!filteredHistory.length && <div className="empty">Записей за этот период нет.</div>}</div>
-      {filteredHistory.length > 12 && <button className="text-button" onClick={() => setExpandedHistory(!expandedHistory)}>{expandedHistory ? 'Свернуть' : `Показать все ${filteredHistory.length}`}</button>}
-      <p className="hint">Для self-paced мероприятий дата исходной записи может быть датой зачисления. Точный день завершения до последней оценки неизвестен.</p>
-    </section>
-    {(skippedEvents.size > 0 || archivedEvents.size > 0) && <p className="footnote">Пропуск сотрудника и архив HR хранятся независимо. Исторические записи участия остаются доступными.</p>}
+    {profile.activity_calendar && <details className="panel personal-calendar"><summary>Мой календарь развития <span>{profile.activity_calendar.total} завершений за год</span></summary><ActivityHeatmap calendar={profile.activity_calendar} /></details>}
+    </>}
+    {pageTab === 'skills' && <>
+    <div className="skills-summary"><h2>Мои навыки</h2><p>Сравнение с требованиями цели. Критических разрывов: {profile.critical_gaps}.</p></div>
+    <div className="two-col"><SkillChart title="Гибкие навыки" type="soft" skills={profile.skills} color="#8965c7" /><SkillChart title="Профессиональные навыки" type="hard" skills={profile.skills} color="#137b6a" /></div>
+    <details className="panel details-panel"><summary>Все навыки выбранной цели <span className="muted">{profile.skills.filter(s => s.required > 0).length}</span></summary>
+      <div className="table-wrap"><table><thead><tr><th>Навык</th><th>Тип</th><th>Сейчас</th><th>Требуется</th><th>Разрыв</th><th>Критический</th></tr></thead><tbody>{profile.skills.filter(s => s.required > 0).sort((a,b) => b.gap - a.gap).map(s => <tr key={s.skill_id}><td><b>{s.name}</b><small className="muted block">{s.skill_id}</small></td><td>{s.type === 'hard' ? 'Hard' : 'Soft'}</td><td>{s.current}</td><td>{s.required}</td><td><span className={s.gap ? 'gap' : 'ok'}>{s.gap}</span></td><td>{s.critical ? 'Да' : '—'}</td></tr>)}</tbody></table></div>
+    </details>
+
+    <div className="two-col"><DynamicsChart profile={profile} /><ActivityChart rows={filteredHistory} /></div>
+
+
+    </>}
+    {pageTab === 'history' && <JournalSection rows={journalRows} filter={journalFilter} onFilter={setJournalFilter} from={historyFrom} onFrom={setHistoryFrom} to={historyTo} onTo={setHistoryTo} expanded={expandedHistory} onExpanded={setExpandedHistory} />}
+    {pageTab === 'history' && (skippedEvents.size > 0 || archivedEvents.size > 0) && <p className="footnote">Пропуск сотрудника и архив HR хранятся независимо. Исторические записи участия остаются доступными.</p>}
   </div>
 }

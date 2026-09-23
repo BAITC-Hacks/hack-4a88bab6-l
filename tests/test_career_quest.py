@@ -737,6 +737,50 @@ def test_hr_denominators_and_separate_mandatory_participation(client: TestClient
     assert all_events.status_code == 200 and len(all_events.json()["participation"]) == 40
 
 
+def test_hr_department_skill_matrix_uses_goal_denominators_and_filters(client: TestClient):
+    _login(client, "hr@careerquest.test")
+    params = {"department": "Backend Development", "grade": "Middle", "type": "hard"}
+    response = client.get("/api/hr/competencies", params=params)
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    observed = {(cell["department"], cell["skill_id"]): cell for cell in payload["department_skills"]}
+
+    expected = {}
+    critical_people = unconfirmed_goals = 0
+    with db.connection() as conn:
+        events, skills, profiles = domain.catalog(conn)
+        people = [json.loads(row[0]) for row in conn.execute("SELECT data FROM employees")]
+        people = [person for person in people if person["department"] == params["department"] and person["grade"] == params["grade"]]
+        for person in people:
+            goal = domain.goal_for(conn, person, profiles)
+            unconfirmed_goals += int(goal["source"] != "explicit")
+            levels, _ = domain.replay(conn, person, events)
+            rows, _, _ = domain.skill_metrics(levels, goal, skills)
+            critical_person = False
+            for row in rows:
+                if row["type"] != "hard":
+                    continue
+                key = (person["department"], row["skill_id"])
+                counts = expected.setdefault(key, {"required_count": 0, "gap_count": 0, "critical_count": 0})
+                counts["required_count"] += 1
+                counts["gap_count"] += int(row["gap"] > 0)
+                counts["critical_count"] += int(row["gap"] > 0 and row["critical"])
+                critical_person = critical_person or bool(row["gap"] and row["critical"])
+            critical_people += int(critical_person)
+
+    assert set(observed) == set(expected)
+    assert payload["employee_count"] == payload["employees_total"] == len(people)
+    assert payload["employees_with_critical_gap"] == critical_people
+    assert payload["employees_unconfirmed_goal"] == unconfirmed_goals
+    assert 0 <= payload["employees_without_step"] <= len(people)
+    for key, counts in expected.items():
+        cell = observed[key]
+        assert cell["required_count"] == counts["required_count"]
+        assert cell["gap_count"] == counts["gap_count"]
+        assert cell["critical_count"] == counts["critical_count"]
+        assert cell["gap_pct"] == round(100 * counts["gap_count"] / counts["required_count"], 1)
+
+
 def test_model_failure_uses_explicit_fallback(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     def failed_call(*_args, **_kwargs):
         raise TimeoutError("controlled test timeout")

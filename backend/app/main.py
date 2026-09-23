@@ -428,6 +428,8 @@ def competencies(department: str = "", role: str = "", grade: str = "", type: st
         people = [loads(r["data"]) for r in conn.execute("SELECT data FROM employees")]
         people = [p for p in people if (not department or p["department"] == department) and (not role or p["role"] == role) and (not grade or p["grade"] == grade)]
         aggregates = {sid: {"skill_id": sid, "name": s["name"], "type": s["type"], "required_count": 0, "gap_count": 0, "gap_pct": 0, "critical_count": 0, "people": [], "events": []} for sid, s in skills.items() if not type or s["type"] == type}
+        department_aggregates = {}
+        employees_with_critical_gap = employees_without_step = employees_unconfirmed_goal = 0
         availability = []
         as_of = meta(conn, "as_of_date")
         for person in people:
@@ -435,24 +437,37 @@ def competencies(department: str = "", role: str = "", grade: str = "", type: st
             info = domain.candidate_info(conn, employee_id)
             eligible_ids = {c["event_id"] for c in info["candidates"]}
             goal = domain.goal_for(conn, person, profiles)
+            employees_unconfirmed_goal += int(goal["source"] != "explicit")
             levels, _ = domain.replay(conn, person, events)
             rows, coverage, _ = domain.skill_metrics(levels, goal, skills)
+            has_critical_gap = False
             for row in rows:
                 aggregate = aggregates.get(row["skill_id"])
                 if not aggregate:
                     continue
                 aggregate["required_count"] += 1
+                key = (person["department"], row["skill_id"])
+                department_aggregate = department_aggregates.setdefault(key, {"department": person["department"], "skill_id": row["skill_id"], "required_count": 0, "gap_count": 0, "gap_pct": None, "critical_count": 0})
+                department_aggregate["required_count"] += 1
                 if row["gap"]:
                     aggregate["gap_count"] += 1
                     aggregate["critical_count"] += int(row["critical"])
+                    department_aggregate["gap_count"] += 1
+                    department_aggregate["critical_count"] += int(row["critical"])
+                    has_critical_gap = has_critical_gap or row["critical"]
                     aggregate["people"].append({"employee_id": employee_id, "full_name": person["full_name"], "current": row["current"], "required": row["required"], "gap": row["gap"], "coverage_status": _skill_coverage(person, levels, row["required"], row["skill_id"], events, as_of, eligible_ids)})
+            employees_with_critical_gap += int(has_critical_gap)
             state = domain.availability_state(conn, employee_id, info)
+            employees_without_step += int(state["candidate_count"] == 0 and state["state"] != "requirements_covered")
             rec = current_recommendations(conn, employee_id)
             availability.append({"employee_id": employee_id, "full_name": person["full_name"], "state": state["state"], "candidate_count": state["candidate_count"], "goal_source": state["goal_source"], "source": rec["source"], "calculated_at": rec["calculated_at"]})
         for sid, aggregate in aggregates.items():
             denominator = aggregate["required_count"]
             aggregate["gap_pct"] = round(100 * aggregate["gap_count"] / denominator, 1) if denominator else None
             aggregate["events"] = [{"event_id": e["event_id"], "title": e["title"], "coverage_status": "catalogued"} for e in events.values() if not e["mandatory"] and any(d["skill_id"] == sid for d in e["develops_skills"])]
+        for aggregate in department_aggregates.values():
+            denominator = aggregate["required_count"]
+            aggregate["gap_pct"] = round(100 * aggregate["gap_count"] / denominator, 1) if denominator else None
         selected_ids = {p["employee_id"] for p in people}
         participation = {eid: {"event_id": eid, "title": e["title"], "mandatory": bool(e["mandatory"]), **{s: 0 for s in ("completed", "in_progress", "dropped", "no_show", "declined", "overdue")}, "skips": 0, "archives": 0} for eid, e in events.items() if mandatory == "all" or bool(e["mandatory"]) == (mandatory == "mandatory")}
         linked = {r["linked_record_id"]: r for r in conn.execute("SELECT * FROM app_participations WHERE linked_record_id IS NOT NULL")}
@@ -477,7 +492,7 @@ def competencies(department: str = "", role: str = "", grade: str = "", type: st
             for row in conn.execute(f"SELECT employee_id,event_id FROM {table} WHERE active=1"):
                 if row["employee_id"] in selected_ids and row["event_id"] in participation:
                     participation[row["event_id"]][field] += 1
-        return {"skills": sorted(aggregates.values(), key=lambda a: (-a["gap_count"], a["name"])), "availability": availability, "participation": list(participation.values()), "employee_count": len(people), "as_of_date": as_of}
+        return {"skills": sorted(aggregates.values(), key=lambda a: (-a["gap_count"], a["name"])), "department_skills": sorted(department_aggregates.values(), key=lambda a: (a["department"], -a["gap_count"], a["skill_id"])), "availability": availability, "participation": list(participation.values()), "employee_count": len(people), "employees_total": len(people), "employees_with_critical_gap": employees_with_critical_gap, "employees_without_step": employees_without_step, "employees_unconfirmed_goal": employees_unconfirmed_goal, "as_of_date": as_of}
 
 
 @app.post("/api/hr/import/preview")

@@ -83,7 +83,7 @@ export type Profile = {
   dynamics: { date: string; skills: Record<string, number> }[]
   history: History[]
   participations: Participation[]
-  skips: { event_id: string; title?: string; reason?: string | null }[]
+  skips: { event_id: string; title?: string; reason?: string | null; created_at?: string | null; updated_at?: string | null }[]
   archives: { event_id: string; title?: string; reason: string }[]
   recommendations: RecSet
   availability?: { state: string; candidate_count: number; goal_source: string }
@@ -104,6 +104,19 @@ export type EmployeeList = {
 }
 
 export type Competencies = {
+  employee_count: number
+  employees_total: number
+  employees_with_critical_gap: number
+  employees_without_step: number
+  employees_unconfirmed_goal: number
+  department_skills: {
+    skill_id: string
+    department: string
+    required_count: number
+    gap_count: number
+    gap_pct: number | null
+    critical_count: number
+  }[]
   skills: {
     skill_id: string
     name: string
