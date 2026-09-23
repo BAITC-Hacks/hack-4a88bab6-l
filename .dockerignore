@@ -1,18 +1,14 @@
-# Secrets and local configuration
-.env
-.env.*
-.env.txt
+.git
+.gitignore
+.env*
 !.env.example
 *.pem
 *.key
-
-# Runtime databases, logs, and caches
 *.sqlite
 *.sqlite3
 *.db
 *.db-*
 *.log
-logs/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -21,20 +17,25 @@ __pycache__/
 .venv/
 venv/
 node_modules/
+frontend/node_modules
+frontend/node_modules/
+**/node_modules
+**/node_modules/**
 frontend/dist/
-*.tsbuildinfo
+frontend/.vite/
+**/.cache/
 coverage/
 runtime/
-.DS_Store
-
-# Local reference packs
+career_quest_dataset/
+career_quest_dataset.zip
 career_quest_codex_pack.zip
 references/
 CAREER_QUEST_CODEX_PROMPT.md
+tmp/
+output/
 
-# Standalone ayko SQLite sidecars
+.venv-*/
 *.sqlite-shm
 *.sqlite-wal
 *.sqlite3-shm
 *.sqlite3-wal
-.venv-*/
