@@ -46,13 +46,21 @@ Import multipart field names: `employees_file`, `events_file`, `skills_file`, `h
 
 `GET /api/employees/{employee_id}/recommendation-context` returns `employee`, `target_role_profile`, `skill_gaps`, `activity_history`, `eligible_events`, `effective_skills`, `target_source`, and the dataset's fixed `as_of_date`. The employee profile's hard/soft skill lists include only skills defined for the target role/grade, so `target_level` is always present. Each positive skill gap includes `development_activities`: eligible activities that develop that skill and can increase its current level, with their gain, cap, projected level, and remaining gap. Skills without a positive target gap return an empty activity list in the employee profile.
 
-The OpenAI module in `app/recommendation_engine.py` returns:
+The OpenAI module in `app/recommendation_engine.py` selects activities. The endpoint enriches each result from the trusted event catalog with an `event` object (title, description, type, format, duration, and upcoming sessions), while preserving `event_id` for completion and history links. A response looks like:
 
 ```json
 {
   "recommendations": [
     {
       "event_id": "EV_005",
+      "event": {
+        "title": "Readable activity title",
+        "description": "Activity description from events.json",
+        "type": "course",
+        "format": "online",
+        "duration_hours": 4.0,
+        "upcoming_sessions": ["2026-10-12"]
+      },
       "rank": 1,
       "explanations": [
         {"factor": "grade_gap", "detail": "..."},

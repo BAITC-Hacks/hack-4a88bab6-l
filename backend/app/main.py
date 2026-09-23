@@ -184,7 +184,19 @@ def get_recommendations(employee_id: str, request: Request) -> dict:
     ranks = sorted(item.rank for item in response.recommendations)
     if ranks != list(range(1, len(ranks) + 1)):
         raise HTTPException(status_code=502, detail="Ранги рекомендаций должны идти подряд с 1")
-    return response.model_dump(mode="json")
+
+    result = response.model_dump(mode="json")
+    for recommendation in result["recommendations"]:
+        event = dataset.events_by_id[recommendation["event_id"]]
+        recommendation["event"] = {
+            "title": event.title,
+            "description": event.description,
+            "type": event.type,
+            "format": event.format,
+            "duration_hours": event.duration_hours,
+            "upcoming_sessions": [session.isoformat() for session in event.upcoming_sessions],
+        }
+    return result
 
 
 @app.post("/api/employees/{employee_id}/activities/{event_id}/complete")
