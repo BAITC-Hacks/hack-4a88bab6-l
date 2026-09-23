@@ -1,6 +1,6 @@
-# Career Quest API
+# Career Quest — standalone ayko API
 
-For the team's Russian-language setup guide, including Windows startup when PowerShell scripts are disabled, see the [root README](../README.md). This file describes the backend contract in more detail.
+For the team's Russian-language setup guide, including Windows startup when PowerShell scripts are disabled, see the [root README](../README.md). This file describes the standalone `app.ayko_main:app` backend contract. The React application uses the separate `backend.app.main:app` entrypoint and different API/database; see the root README.
 
 Python/FastAPI backend for the Career Quest demo. It loads the checked-in dataset, validates its structure and references, exposes employee/HR data, generates grounded activity recommendations through the OpenAI API, and saves completed development activities to SQLite.
 
@@ -11,23 +11,23 @@ From the repository root:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r backend/requirements.txt
-uvicorn app.main:app --app-dir backend --reload
+python -m pip install -r backend/requirements-ayko.txt
+uvicorn app.ayko_main:app --app-dir backend --port 8001 --reload
 ```
 
 Before starting the backend, install dependencies and set your OpenAI API key in the same PowerShell window. Never commit or share the key:
 
 ```powershell
-python -m pip install -r backend/requirements.txt
+python -m pip install -r backend/requirements-ayko.txt
 $env:OPENAI_API_KEY = "your-api-key"
 # Optional: choose a model enabled for your API account
 $env:OPENAI_MODEL = "gpt-6-astra"
-uvicorn app.main:app --app-dir backend --reload
+uvicorn app.ayko_main:app --app-dir backend --port 8001 --reload
 ```
 
 The recommendation endpoint is `GET /api/employees/{employee_id}/recommendations`. It uses the same current profile, effective skills, history, and target gaps as the employee profile endpoint, then asks OpenAI to rank only eligible activities that can raise a target skill. The API validates event IDs, duplicate selections, rank order, and at least three distinct evidence factors. Missing API key returns `503`; provider or response errors return `502`.
 
-The API docs are at `http://127.0.0.1:8000/docs`. By default, the data folder is `career_quest_dataset/` and the SQLite file is `backend/data/career_quest.sqlite3`. Override them with `DATASET_DIR` and `DATABASE_PATH` environment variables.
+The API docs are at `http://127.0.0.1:8001/docs`. By default, the data folder is `career_quest_dataset/` and the SQLite file is `backend/data/career_quest.sqlite3`. Override them with `DATASET_DIR` and `DATABASE_PATH` environment variables.
 
 ## Routes
 
@@ -84,13 +84,13 @@ Every recommendation must refer to an eligible event and include at least three 
 
 Implementation specification: [HR_VIEW_TASK.md](HR_VIEW_TASK.md).
 
-Stop an existing server on port 8000 first. From the repository root, start the HR-enabled demo with:
+Stop an existing server on port 8001 first. From the repository root, start the HR-enabled demo with:
 
 ```powershell
 .\backend\start_hr.ps1
 ```
 
-The script prompts for a password without displaying it, sets `HR_PASSWORD` for the server process, and runs the app using the repository's virtual environment. Open `http://127.0.0.1:8000/hr` and enter that password. Existing `OPENAI_API_KEY` configuration is inherited; the HR dashboard itself does not call OpenAI.
+The script prompts for a password without displaying it, sets `HR_PASSWORD` for the server process, and runs the app using the repository's virtual environment. Open `http://127.0.0.1:8001/hr` and enter that password. Existing `OPENAI_API_KEY` configuration is inherited; the HR dashboard itself does not call OpenAI.
 
 Alternatively, set `HR_PASSWORD` in your server environment before your usual uvicorn command. There is no default HR password. `/api/hr/login` accepts `{"password":"..."}` and sets an opaque HttpOnly, SameSite=Strict session cookie. `GET /api/hr/summary` requires that session (401 otherwise); sending a role name from the frontend does not grant access. Sessions expire after eight hours or on server restart/reload. This demo uses one HR account and one server worker; employee endpoints and data import retain their existing demo access behavior.
 

@@ -142,7 +142,7 @@ class HRAPITests(HRFixture):
         super().setUp()
         self.env = patch.dict(os.environ, {"DATABASE_PATH": str(self.store.database_path), "HR_PASSWORD": "test-only-password"})
         self.env.start()
-        from app import main, auth
+        from app import ayko_main as main, auth
         from fastapi.testclient import TestClient
         self.main = main
         self.previous_store, self.previous_dataset = main.activity_store, main.app.state.dataset
