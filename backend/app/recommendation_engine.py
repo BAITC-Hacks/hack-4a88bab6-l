@@ -60,36 +60,7 @@ OUTPUT_SCHEMA = {
 def _model_input(context: dict) -> dict:
     """Minimize data sent to the model and only offer activities that close a gap."""
     gaps = [gap for gap in context["skill_gaps"] if gap["gap"] > 0]
-    gap_by_skill = {gap["skill_id"]: gap for gap in gaps}
-    candidates = []
-    for event in context["eligible_events"]:
-        developments = []
-        for development in event["develops_skills"]:
-            gap = gap_by_skill.get(development["skill_id"])
-            if not gap:
-                continue
-            current = gap["current_level"]
-            projected = max(current, min(current + development["gain"], development["max_level"]))
-            if projected > current:
-                developments.append({
-                    "skill_id": gap["skill_id"],
-                    "skill_name": gap["name"],
-                    "critical": gap["is_critical"],
-                    "current_level": current,
-                    "target_level": gap["target_level"],
-                    "projected_level": projected,
-                })
-        if developments:
-            candidates.append({
-                "event_id": event["event_id"],
-                "title": event["title"],
-                "description": event["description"],
-                "type": event["type"],
-                "format": event["format"],
-                "duration_hours": event["duration_hours"],
-                "upcoming_sessions": event["upcoming_sessions"],
-                "develops_gaps": developments,
-            })
+    candidates = context["recommendation_candidates"]
 
     employee = context["employee"]
     return {
@@ -113,15 +84,14 @@ def _model_input(context: dict) -> dict:
 
 
 def recommend(context: dict) -> dict:
+    payload = _model_input(context)
+    if not payload["eligible_activities_that_raise_a_target_skill"]:
+        return {"recommendations": []}
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RecommendationEngineUnavailable(
             "Не задан OPENAI_API_KEY. Установите ключ OpenAI API в переменную окружения."
         )
-
-    payload = _model_input(context)
-    if not payload["eligible_activities_that_raise_a_target_skill"]:
-        return {"recommendations": []}
 
     model = os.getenv("OPENAI_MODEL", "gpt-6-astra")
     try:

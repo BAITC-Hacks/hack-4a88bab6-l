@@ -101,12 +101,82 @@ def eligible_events(
             continue
         if event.event_id in completed_ids and event.event_id not in REPEATABLE_EVENT_IDS:
             continue
-        if event.upcoming_sessions and not any(session >= dataset.as_of_date for session in event.upcoming_sessions):
+        if event.format != "self_paced" and not any(session >= dataset.as_of_date for session in event.upcoming_sessions):
             continue
         if any(effective_levels.get(skill_id, 0) < level for skill_id, level in event.prerequisites.items()):
             continue
         result.append(event)
     return result
+
+
+def recommendation_candidates(
+    employee: Employee,
+    dataset: Dataset,
+    history: list[ActivityHistoryRecord],
+    effective_levels: dict[str, int],
+) -> list[dict]:
+    """Single source of useful, eligible next steps for the profile, AI and HR."""
+    gaps = {gap["skill_id"]: gap for gap in skill_gap_vector(employee, dataset, effective_levels)
+            if gap["gap"] > 0}
+    result = []
+    for event in eligible_events(employee, dataset, history, effective_levels):
+        improvements = []
+        for development in event.develops_skills:
+            gap = gaps.get(development.skill_id)
+            if gap is None:
+                continue
+            current = gap["current_level"]
+            projected = max(current, min(current + development.gain, development.max_level))
+            reduction = min(gap["gap"], projected - current)
+            if reduction <= 0:
+                continue
+            improvements.append({**gap, "projected_level": projected,
+                                 "gap_reduction": reduction, "remaining_gap": gap["gap"] - reduction})
+        if improvements:
+            result.append({
+                **event.model_dump(mode="json"),
+                "improved_skills": improvements,
+                "requirements_closed_count": sum(item["remaining_gap"] == 0 for item in improvements),
+                "total_gap_reduction": sum(item["gap_reduction"] for item in improvements),
+            })
+    return sorted(result, key=lambda item: (-item["total_gap_reduction"], item["event_id"]))
+
+
+def recommendation_blockers(employee: Employee, dataset: Dataset,
+                            history: list[ActivityHistoryRecord], levels: dict[str, int]) -> list[dict]:
+    """Explain blocking conditions per target skill, with supporting catalog event IDs."""
+    if target_profile_for(employee, dataset)[0] is None:
+        return [{"code": "career_goal_missing", "skill_id": None, "event_ids": []}]
+    completed = {record.event_id for record in history if record.status == "completed"}
+    reasons = []
+    for gap in skill_gap_vector(employee, dataset, levels):
+        if gap["gap"] <= 0:
+            continue
+        events = [event for event in dataset.events if not event.mandatory
+                  and any(dev.skill_id == gap["skill_id"] for dev in event.develops_skills)]
+        if not events:
+            reasons.append({"code": "catalog_has_no_skill_event", "skill_id": gap["skill_id"], "event_ids": []})
+        by_code: dict[str, list[str]] = {}
+        for event in events:
+            codes = []
+            if employee.role not in event.target_roles:
+                codes.append("role_not_eligible")
+            if employee.grade not in event.target_grades:
+                codes.append("grade_not_eligible")
+            if any(levels.get(skill, 0) < level for skill, level in event.prerequisites.items()):
+                codes.append("prerequisites_not_met")
+            if event.event_id in completed and event.event_id not in REPEATABLE_EVENT_IDS:
+                codes.append("already_completed")
+            if event.format != "self_paced" and not any(day >= dataset.as_of_date for day in event.upcoming_sessions):
+                codes.append("no_upcoming_session")
+            dev = next(dev for dev in event.develops_skills if dev.skill_id == gap["skill_id"])
+            if min(gap["current_level"] + dev.gain, dev.max_level) <= gap["current_level"]:
+                codes.append("skill_cap_prevents_gain")
+            for code in codes:
+                by_code.setdefault(code, []).append(event.event_id)
+        reasons.extend({"code": code, "skill_id": gap["skill_id"], "event_ids": ids}
+                       for code, ids in sorted(by_code.items()))
+    return reasons
 
 
 def development_activities_for_skill(
@@ -166,10 +236,11 @@ def recommendation_context(
     effective_levels = effective_skill_levels(employee, dataset.events_by_id, history)
     target_profile, target_source = target_profile_for(employee, dataset)
     gaps = skill_gap_vector(employee, dataset, effective_levels)
-    candidates = eligible_events(employee, dataset, history, effective_levels)
+    candidates = recommendation_candidates(employee, dataset, history, effective_levels)
+    candidate_events = [dataset.events_by_id[item["event_id"]] for item in candidates]
     for gap in gaps:
         gap["development_activities"] = development_activities_for_skill(
-            gap["skill_id"], gap["current_level"], gap["gap"], candidates
+            gap["skill_id"], gap["current_level"], gap["gap"], candidate_events
         )
     return {
         "employee": employee.model_dump(mode="json"),
@@ -178,10 +249,8 @@ def recommendation_context(
         "effective_skills": effective_levels,
         "skill_gaps": gaps,
         "activity_history": [record.model_dump(mode="json") for record in history],
-        "eligible_events": [
-            event.model_dump(mode="json")
-            for event in eligible_events(employee, dataset, history, effective_levels)
-        ],
+        "eligible_events": candidates,
+        "recommendation_candidates": candidates,
         "as_of_date": dataset.as_of_date.isoformat(),
     }
 

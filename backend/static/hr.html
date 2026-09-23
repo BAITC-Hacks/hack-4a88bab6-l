@@ -1,103 +1,70 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Career Quest — HR view</title>
-  <style>
-    :root { color-scheme: light; font-family: Inter, Segoe UI, Arial, sans-serif; color: #172033; background: #f4f6fb; }
-    * { box-sizing: border-box; }
-    body { margin: 0; }
-    header { padding: 28px max(24px, calc((100% - 1200px) / 2)); background: #172554; color: white; }
-    header h1 { margin: 0 0 6px; font-size: 25px; }
-    header p { margin: 0; color: #c7d2fe; }
-    main { max-width: 1200px; margin: 24px auto; padding: 0 20px 40px; }
-    .metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
-    .metric, section { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 2px 8px #1725540a; }
-    .metric { padding: 18px 20px; }
-    .metric span { display: block; color: #64748b; font-size: 14px; }
-    .metric strong { display: block; margin-top: 6px; font-size: 30px; }
-    section { margin-top: 18px; overflow: hidden; }
-    section h2 { margin: 0; padding: 16px 18px; font-size: 18px; border-bottom: 1px solid #e2e8f0; }
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid #edf0f5; vertical-align: top; }
-    th { color: #64748b; font-weight: 600; background: #fafbfe; white-space: nowrap; }
-    tr:last-child td { border-bottom: 0; }
-    .badge { display: inline-block; border-radius: 999px; padding: 3px 8px; background: #eef2ff; color: #3730a3; white-space: nowrap; }
-    .empty { padding: 20px; color: #64748b; }
-    #status { margin: 16px 0; color: #64748b; }
-    #status.error { color: #b91c1c; }
-    @media (max-width: 600px) { .metrics { grid-template-columns: 1fr; } header { padding: 22px 20px; } }
-  </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Career Quest · HR</title>
+<style>
+:root{font-family:Segoe UI,Arial,sans-serif;color:#182d37;background:#f4f7f6;font-size:14px}*{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}button,a,select{touch-action:manipulation}button{cursor:pointer}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #d29421;outline-offset:3px}button{background:white;border:1px solid #cbd9d4;border-radius:8px;padding:9px 14px;color:inherit}button:hover{background:#edf5f1}button.primary{background:#12654d;color:white;border-color:#12654d}a{color:#11694f}header{background:#173e33;color:white;padding:24px max(24px,calc((100% - 1440px)/2));display:flex;justify-content:space-between;align-items:center;gap:20px}header button{color:#173e33}header p{color:#bcd8ce;margin:6px 0 0}h1{font-size:25px;margin:0;letter-spacing:-.5px}h2{font-size:18px;margin:0}h3{font-size:15px}main{max-width:1480px;margin:auto;padding:26px 24px 60px}.eyebrow{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#bcd8ce;margin-bottom:8px}.muted,.note{color:#647871}.note{font-size:12px;line-height:1.55;margin:8px 0}.login{max-width:440px;margin:80px auto;background:white;border:1px solid #dbe5e0;border-radius:14px;padding:28px}.login input{width:100%;margin:8px 0 16px}.login button{width:100%}input,select{border:1px solid #cbd9d4;border-radius:7px;padding:9px;background:white;color:inherit}.toolbar{display:flex;gap:14px;flex-wrap:wrap;align-items:end;margin-bottom:20px;background:white;border:1px solid #dbe5e0;padding:16px;border-radius:12px}.toolbar label{display:flex;flex-direction:column;gap:6px;font-size:12px}.toolbar .check{flex-direction:row;align-items:center;padding:10px 0}.toolbar select{max-width:250px}.status{min-height:22px;margin-bottom:16px}.error{color:#a62f24}.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-bottom:22px}.kpi{text-align:left;padding:18px;border:1px solid #dbe5e0;box-shadow:0 2px 2px #15392a03;border-radius:12px;display:flex;flex-direction:column;min-height:144px}.kpi span{font-size:12px;color:#526a60}.kpi strong{font-size:34px;letter-spacing:-1px;margin:12px 0 5px;font-weight:600}.kpi small{font-size:11px;color:#647871;line-height:1.4}.kpi.alert strong{color:#a66617}.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}section.panel{background:white;border:1px solid #dbe5e0;border-radius:12px;margin-bottom:20px;overflow:hidden}.panel-head{padding:20px;border-bottom:1px solid #e6ece9;display:flex;justify-content:space-between;gap:12px;align-items:start;flex-wrap:wrap}.panel-body{padding:20px}.scroll{overflow:auto;max-height:440px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{padding:12px;text-align:left;border-bottom:1px solid #edf1ef;vertical-align:top}th{position:sticky;top:0;background:#f7faf8;color:#60766b;z-index:1;font-weight:600}td small{display:block;color:#6c8076;margin-top:5px}td a{font-weight:600}tr[data-profile-row]{cursor:pointer}tr[data-profile-row]:hover{background:#f2f8f4}tr:last-child td{border-bottom:0}.badge{display:inline-block;background:#eef5f1;color:#26604a;border-radius:5px;padding:3px 7px;font-size:11px;margin:2px 3px 2px 0}.empty{padding:25px;color:#6c8076}.bar-row{display:grid;grid-template-columns:minmax(110px,180px) 1fr 36px;gap:10px;align-items:center;margin-bottom:12px;font-size:12px}.bar-track{background:#edf3ef;border-radius:3px;height:13px;overflow:hidden}.bar-fill{height:100%;background:#247b5d;border-radius:3px}.heatmap td{min-width:75px;text-align:center}.heatmap th:first-child{min-width:160px}.heatmap td.na{background:#f7f9f8;color:#8f9d97}.heatmap td{font-variant-numeric:tabular-nums}.stack{display:flex;height:28px;border-radius:6px;overflow:hidden;background:#edf3ef;margin:16px 0}.stack span{min-width:0}.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px}.legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}.tabs{display:flex;gap:6px}.tabs [aria-pressed=true]{background:#173e33;color:white;border-color:#173e33}.full{grid-column:1/-1}dialog{border:1px solid #d0ded7;border-radius:14px;width:min(1150px,95vw);max-height:90vh;padding:0;box-shadow:0 20px 80px #12332830}dialog::backdrop{background:#152a2460}dialog .dialog-top{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:18px 22px;background:#f5f9f7;position:sticky;top:0;z-index:2}dialog .content{padding:22px}.trajectory{border-left:4px solid #247b5d;background:#f0f7f3;padding:16px;margin:16px 0}.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.next-step{border:1px solid #e0e9e3;padding:12px;border-radius:8px;margin:8px 0}progress{width:100%;height:14px;accent-color:#247b5d}.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}[hidden]{display:none!important}@media(max-width:1050px){.kpis{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}}@media(max-width:640px){main{padding:16px 12px}header{padding:20px 16px}.kpis{grid-template-columns:1fr 1fr}.kpi{padding:14px;min-height:132px}.kpi strong{font-size:29px}.profile-grid{grid-template-columns:1fr}.toolbar label{width:100%}.toolbar select{max-width:100%;width:100%}.panel-head{padding:16px}}
+</style>
 </head>
 <body>
-  <header>
-    <h1>Career Quest · HR view</h1>
-    <p>Навыковые разрывы, участие в активностях и сотрудники без подходящего следующего шага</p>
-  </header>
-  <main>
-    <div id="status">Загружаю HR-сводку…</div>
-    <div class="metrics">
-      <div class="metric"><span>Сотрудников в датасете</span><strong id="employees-count">—</strong></div>
-      <div class="metric"><span>Без подходящего следующего шага</span><strong id="no-step-count">—</strong></div>
-    </div>
-    <section>
-      <h2>Навыки с наиболее частыми разрывами</h2>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Навык</th><th>Тип</th><th>Сотрудников с разрывом</th><th>Сумма уровней разрыва</th><th>Критичный для роли</th></tr></thead>
-        <tbody id="gaps"></tbody>
-      </table></div>
-    </section>
-    <section>
-      <h2>Участие по активностям</h2>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Активность</th><th>Участников</th><th>Записей</th><th>Завершено</th><th>В процессе</th><th>Пропуски / отказ</th></tr></thead>
-        <tbody id="participation"></tbody>
-      </table></div>
-    </section>
-    <section>
-      <h2>Сотрудники без подходящего следующего шага</h2>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Сотрудник</th><th>Роль</th><th>Грейд</th><th>Причина</th></tr></thead>
-        <tbody id="no-step"></tbody>
-      </table></div>
-    </section>
-  </main>
-  <script>
-    const escapeHtml = value => String(value ?? "—").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-    const rows = (items, render, empty) => items.length ? items.map(render).join("") : `<tr><td class="empty" colspan="8">${empty}</td></tr>`;
-    const reasonLabels = {
-      no_target_role_profile: "Нет целевого профиля роли/грейда",
-      no_positive_skill_gaps: "Нет положительных разрывов навыков",
-      no_eligible_activity_closes_a_skill_gap: "Нет доступной активности, закрывающей разрыв",
-    };
-    async function loadSummary() {
-      const status = document.querySelector("#status");
-      try {
-        const response = await fetch("/api/hr/summary");
-        if (!response.ok) throw new Error(`API вернул HTTP ${response.status}`);
-        const data = await response.json();
-        document.querySelector("#employees-count").textContent = data.employees_count;
-        document.querySelector("#no-step-count").textContent = data.employees_without_recommended_step.length;
-        document.querySelector("#gaps").innerHTML = rows(data.skills_with_most_gaps, item =>
-          `<tr><td>${escapeHtml(item.name)}</td><td><span class="badge">${escapeHtml(item.type)}</span></td><td>${item.employees_with_gap}</td><td>${item.total_gap_levels}</td><td>${item.critical_for_count}</td></tr>`,
-          "Навыковые разрывы не найдены.");
-        document.querySelector("#participation").innerHTML = rows(data.participation_by_activity, item => {
-          const counts = item.status_counts || {};
-          const missed = (counts.no_show || 0) + (counts.declined || 0) + (counts.dropped || 0) + (counts.overdue || 0);
-          return `<tr><td>${escapeHtml(item.title)}</td><td>${item.employees_count}</td><td>${item.total_records}</td><td>${counts.completed || 0}</td><td>${counts.in_progress || 0}</td><td>${missed}</td></tr>`;
-        }, "Активности не найдены.");
-        document.querySelector("#no-step").innerHTML = rows(data.employees_without_recommended_step, item =>
-          `<tr><td>${escapeHtml(item.full_name)}</td><td>${escapeHtml(item.role)}</td><td>${escapeHtml(item.grade)}</td><td>${escapeHtml(reasonLabels[item.reason] || item.reason)}</td></tr>`,
-          "У всех сотрудников есть подходящий следующий шаг.");
-        status.textContent = "Сводка обновлена из текущего датасета.";
-      } catch (error) {
-        status.textContent = `Не удалось загрузить HR-сводку: ${error.message}`;
-        status.classList.add("error");
-      }
-    }
-    loadSummary();
-  </script>
-</body>
-</html>
+<header><div><div class="eyebrow">Career Quest / People development</div><h1>Развитие команды</h1><p>Навыки, карьерные цели и следующие шаги</p></div><button id="logout" hidden>Выйти</button></header>
+<main>
+<form id="login" class="login"><h2>Вход для HR</h2><p class="muted">Войдите, чтобы открыть аналитику развития сотрудников.</p><label for="password">Пароль HR</label><input id="password" type="password" autocomplete="current-password" required><button class="primary" type="submit">Войти</button><p id="login-status" role="alert" class="error"></p></form>
+<div id="dashboard" hidden>
+<form id="filters" class="toolbar">
+<label>Подразделение<select id="department" name="department"><option value="">Все подразделения</option></select></label>
+<label>Текущая роль<select id="role" name="role"><option value="">Все роли</option></select></label>
+<label>Текущий грейд<select id="grade" name="grade"><option value="">Все грейды</option></select></label>
+<label class="check"><input id="critical" type="checkbox" name="critical_only"> Только с критическими разрывами</label>
+<button type="reset">Сбросить</button><button type="button" id="refresh">Обновить</button>
+</form>
+<div id="status" class="status" role="status" aria-live="polite"></div>
+<div class="kpis">
+<button class="kpi" data-action="all"><span>Всего сотрудников</span><strong id="total">—</strong><small id="target-count">В выбранной группе</small></button>
+<button class="kpi alert" data-action="critical"><span>С критическим разрывом</span><strong id="critical-count">—</strong><small>Хотя бы один критичный навык ниже цели</small></button>
+<button class="kpi alert" data-action="no-step"><span>Без полезного шага</span><strong id="no-step-count">—</strong><small>Есть цель и разрывы, нет полезного события</small></button>
+<button class="kpi" data-action="no-target"><span>Без карьерной цели</span><strong id="no-target-count">—</strong><small>Целевой профиль не определён</small></button>
+<button class="kpi" data-action="participation" title="Completed / (completed + dropped + no_show + declined). In progress и overdue не входят в знаменатель."><span>Завершение добровольных</span><strong id="completion-rate">—</strong><small id="completion-count">По завершённым исходам</small></button>
+</div>
+<div class="grid">
+<section class="panel"><div class="panel-head"><div><h2>Навыки с наибольшими разрывами</h2><p class="note">Доля рассчитана среди сотрудников, которым навык требуется.</p></div><label>Сортировка <select id="skill-sort"><option value="employees_with_gap">Сотрудники с разрывом</option><option value="gap_rate">Доля с разрывом</option><option value="total_missing_levels">Недостающие уровни</option><option value="critical_gap_count">Критические разрывы</option></select></label></div><div id="skill-bars" class="panel-body"></div><div class="scroll"><table><thead><tr><th>Навык</th><th>С разрывом / требуется</th><th>Доля</th><th>Недостаёт уровней</th><th>Критических</th></tr></thead><tbody id="skills"></tbody></table></div></section>
+<section class="panel"><div class="panel-head"><div><h2>Разрывы по подразделениям</h2><p class="note">Чем темнее ячейка, тем выше доля с разрывом. Наведите курсор для деталей. «—» означает, что навык не требуется.</p></div></div><div class="scroll"><table class="heatmap" id="heatmap"></table></div></section>
+<section class="panel full" id="no-step-section"><div class="panel-head"><div><h2>Сотрудники без полезного следующего шага</h2><p class="note">Событие должно быть доступно и уменьшать хотя бы один целевой разрыв. Нажмите имя для просмотра профиля.</p></div></div><div class="scroll" id="no-step-table"></div></section>
+<section class="panel full" id="no-target-section"><div class="panel-head"><div><h2>Не определена карьерная цель</h2><p class="note">Эти сотрудники учитываются отдельно от сотрудников без полезного шага.</p></div></div><div class="scroll" id="no-target-table"></div></section>
+<section class="panel full" id="participation-section"><div class="panel-head"><div><h2>Участие в активностях</h2><p class="note">Completion rate = completed / (completed + dropped + no_show + declined). Незавершённые исходы исключены.</p></div><div class="tabs"><button data-group="voluntary" aria-pressed="true">Добровольные</button><button data-group="mandatory" aria-pressed="false">Обязательные</button></div></div><div class="panel-body"><div id="stack" class="stack" role="img" aria-label="Распределение статусов участия"></div><div id="legend" class="legend"></div><p class="note">«Участники» — уникальные сотрудники; «Записи» учитывают повторные участия. Средние оценки включают только заполненные значения.</p><label>Сортировка <select id="activity-sort"><option value="employees_count">Участники</option><option value="completion_rate">Completion rate: ниже сначала</option><option value="no_show">No-show</option><option value="dropped">Dropped</option></select></label></div><div class="scroll"><table><thead><tr><th>Активность / тип</th><th>Формат</th><th>Участники / записи</th><th>Completed</th><th>In progress</th><th>Dropped</th><th>No-show</th><th>Declined</th><th>Overdue</th><th>Completion rate</th><th>Feedback / score</th><th>Self / manager / HR</th></tr></thead><tbody id="activities"></tbody></table></div></section>
+</div></div>
+</main>
+<dialog id="details"><div class="dialog-top"><h2 id="dialog-title">Профиль</h2><button id="close-dialog" aria-label="Закрыть окно">Закрыть</button></div><div id="dialog-content" class="content"></div></dialog>
+<script>
+const $ = s => document.querySelector(s);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct = v => v == null ? '—' : (100*v).toLocaleString('ru-RU',{maximumFractionDigits:1})+'%';
+const avg = v => v == null ? '—' : v.toLocaleString('ru-RU',{maximumFractionDigits:1});
+const empty = (text,n=8) => `<tr><td class="empty" colspan="${n}">${esc(text)}</td></tr>`;
+const reasons = {career_goal_missing:'Не определена карьерная цель',catalog_has_no_skill_event:'В каталоге нет события для навыка',role_not_eligible:'Не подходит текущая роль',grade_not_eligible:'Не подходит текущий грейд',prerequisites_not_met:'Не выполнены предварительные требования',already_completed:'Событие уже завершено',no_upcoming_session:'Нет будущей сессии',skill_cap_prevents_gain:'Ограничение уровня не даёт прироста'};
+const statusInfo = {completed:['Завершено','#247b5d'],in_progress:['В процессе','#668ead'],dropped:['Брошено','#cb9143'],no_show:['Неявка','#c5634c'],declined:['Отказ','#9d839b'],overdue:['Просрочено','#6e747e']};
+let data=null, group='voluntary', controller=null, timer=null, profileController=null;
+function showLogin(){data=null;controller?.abort();profileController?.abort();$('#details').close();$('#dialog-content').replaceChildren();$('#dashboard').hidden=true;$('#logout').hidden=true;$('#login').hidden=false;clearInterval(timer);}
+async function api(url, options={}){const response=await fetch(url,{credentials:'same-origin',...options});if(!response.ok){if(response.status===401&&url!='/api/hr/login')showLogin();let error;try{error=await response.json()}catch{}throw new Error(typeof error?.detail==='string'?error.detail:`Ошибка HTTP ${response.status}`)}return response.json()}
+function showDashboard(){$('#login').hidden=true;$('#dashboard').hidden=false;$('#logout').hidden=false;clearInterval(timer);timer=setInterval(()=>{if(!document.hidden)load()},30000);load()}
+$('#login').addEventListener('submit',async e=>{e.preventDefault();$('#login-status').textContent='';const button=e.submitter;button.disabled=true;try{await api('/api/hr/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('#password').value})});$('#password').value='';showDashboard()}catch(error){$('#login-status').textContent=error.message}finally{button.disabled=false}});
+$('#logout').addEventListener('click',async()=>{try{await api('/api/hr/logout',{method:'POST'});showLogin()}catch(error){$('#status').textContent=error.message}});
+function fillOptions(selector,values){const select=$(selector),value=select.value;const first=select.options[0].text;select.innerHTML=`<option value="">${esc(first)}</option>`+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');select.value=value}
+async function load(){controller?.abort();controller=new AbortController();const signal=controller.signal;const params=new URLSearchParams();['department','role','grade'].forEach(key=>{if($('#'+key).value)params.set(key,$('#'+key).value)});if($('#critical').checked)params.set('critical_only','true');$('#status').className='status';$('#status').textContent='Обновляем данные…';$('#dashboard').setAttribute('aria-busy','true');try{const result=await api('/api/hr/summary?'+params,{signal});if(signal.aborted)return;data=result;fillOptions('#department',data.filter_options.departments);fillOptions('#role',data.filter_options.roles);fillOptions('#grade',data.filter_options.grades);render();$('#status').textContent=`Срез ${data.as_of_date} · ${data.overview.employees_total?'Обновлено '+new Date().toLocaleTimeString('ru-RU'):'По выбранным фильтрам сотрудников нет.'}`+(data.filters.critical_only?' · Показаны сотрудники с критическими разрывами; в таблицах навыков — критические требования.':'')}catch(error){if(error.name!=='AbortError'){$('#status').className='status error';$('#status').textContent=error.message+' Нажмите «Обновить», чтобы повторить.'}}finally{if(!signal.aborted)$('#dashboard').setAttribute('aria-busy','false')}}
+$('#filters').addEventListener('change',load);$('#filters').addEventListener('submit',e=>e.preventDefault());$('#filters').addEventListener('reset',()=>setTimeout(load,0));$('#refresh').addEventListener('click',load);
+function employeeTable(items){return `<table><thead><tr><th>Сотрудник</th><th>Подразделение</th><th>Текущая позиция</th><th>Цель</th><th>Критические разрывы</th><th>Остальные разрывы</th><th>Причины</th></tr></thead><tbody>`+(items.length?items.map(item=>`<tr data-profile-row="${esc(item.employee_id)}"><td><a href="#employee=${encodeURIComponent(item.employee_id)}" data-employee="${esc(item.employee_id)}">${esc(item.full_name)}</a><small>${esc(item.employee_id)}</small></td><td>${esc(item.department)}</td><td>${esc(item.role)}<small>${esc(item.grade)}</small></td><td>${item.target?esc(item.target.role)+'<small>'+esc(item.target.grade)+'</small>':'Не определена'}</td><td>${item.critical_gaps.map(g=>`${esc(g.name)}: ${g.current_level} / ${g.target_level}`).join('<br>')||'—'}</td><td>${item.other_gaps_count}</td><td>${(item.reasons||[]).map(code=>`<span class="badge">${esc(reasons[code]||code)}</span>`).join('')||'—'}${item.reason_details?.length?`<details><summary>Подробнее</summary>${item.reason_details.map(r=>`<p>${esc(data.skill_gaps.find(s=>s.skill_id===r.skill_id)?.name||r.skill_id||'Цель')}: ${esc(reasons[r.code]||r.code)}${r.event_ids.length?' ('+r.event_ids.map(id=>esc(data.activity_participation.find(a=>a.event_id===id)?.title||id)).join(', ')+')':''}</p>`).join('')}</details>`:''}</td></tr>`).join(''):empty('Таких сотрудников нет.',7))+'</tbody></table>'}
+function render(){const o=data.overview;$('#total').textContent=o.employees_total;$('#target-count').textContent=`С определённой целью: ${o.employees_with_target}`;$('#critical-count').textContent=o.employees_with_critical_gap;$('#no-step-count').textContent=o.employees_without_recommendation;$('#no-target-count').textContent=o.employees_without_target;$('#completion-rate').textContent=pct(o.voluntary_completion_rate);$('#completion-count').textContent=`${o.voluntary_completed} завершений / ${o.voluntary_completed_outcomes} исходов`;$('#no-step-table').innerHTML=employeeTable(data.employees_without_recommendation);$('#no-target-table').innerHTML=employeeTable(data.employees_without_target);renderSkills();renderHeatmap();renderActivities()}
+function renderSkills(){if(!data)return;const key=$('#skill-sort').value;const items=[...data.skill_gaps].sort((a,b)=>b[key]-a[key]||a.name.localeCompare(b.name));const top=items.filter(item=>item.employees_with_gap>0).slice(0,10),max=Math.max(1,...top.map(i=>i[key]));$('#skill-bars').innerHTML=top.length?top.map(i=>`<div class="bar-row"><span>${esc(i.name)}</span><div class="bar-track" title="${esc(i.name)}: ${key==='gap_rate'?pct(i[key]):i[key]}"><div class="bar-fill" style="width:${100*i[key]/max}%"></div></div><strong>${key==='gap_rate'?pct(i[key]):i[key]}</strong></div>`).join(''):'<div class="empty">Разрывов по выбранным фильтрам нет.</div>';$('#skills').innerHTML=items.map(i=>`<tr><td>${esc(i.name)}<small>${esc(i.type)}</small></td><td>${i.employees_with_gap} / ${i.employees_requiring_skill}</td><td>${pct(i.gap_rate)}</td><td>${i.total_missing_levels}</td><td>${i.critical_gap_count}</td></tr>`).join('')||empty('Требований к навыкам нет.',5)}
+function renderHeatmap(){const departments=[...new Set(data.employees.map(e=>e.department))].sort();const cells=new Map(data.department_skill_gaps.map(i=>[JSON.stringify([i.skill_id,i.department]),i]));$('#heatmap').innerHTML='<thead><tr><th>Навык</th>'+departments.map(d=>`<th>${esc(d)}</th>`).join('')+'</tr></thead><tbody>'+data.skill_gaps.map(skill=>'<tr><th>'+esc(skill.name)+'</th>'+departments.map(dept=>{const cell=cells.get(JSON.stringify([skill.skill_id,dept]));if(!cell)return '<td class="na">—</td>';const tip=`Требуется: ${cell.employees_requiring_skill}; с разрывом: ${cell.employees_with_gap}; доля: ${pct(cell.gap_rate)}; критических: ${cell.critical_gap_count}; недостаёт уровней: ${cell.total_missing_levels}`;return `<td tabindex="0" aria-label="${esc(skill.name+', '+dept+': '+tip)}" title="${esc(tip)}" style="background:rgba(26,115,79,${.06+.82*cell.gap_rate});color:${cell.gap_rate>.6?'white':'#173e33'}">${pct(cell.gap_rate)}</td>`}).join('')+'</tr>').join('')+'</tbody>';if(!data.skill_gaps.length)$('#heatmap').innerHTML='<tbody>'+empty('Нет данных для матрицы.')+'</tbody>'}
+function renderActivities(){if(!data)return;const statuses=data.activity_statuses[group];const total=Object.values(statuses).reduce((a,b)=>a+b,0);$('#stack').innerHTML=Object.entries(statuses).filter(([,v])=>v).map(([key,value])=>`<span style="width:${100*value/total}%;background:${statusInfo[key][1]}" title="${statusInfo[key][0]}: ${value}"></span>`).join('');$('#stack').setAttribute('aria-label',Object.entries(statuses).map(([k,v])=>statusInfo[k][0]+': '+v).join(', '));$('#legend').innerHTML=Object.entries(statuses).map(([k,v])=>`<span><i style="background:${statusInfo[k][1]}"></i>${statusInfo[k][0]}: <strong>${v}</strong></span>`).join('')+(!total?'<span>Участий по выбранным фильтрам нет.</span>':'');const key=$('#activity-sort').value,items=data.activity_participation.filter(i=>i.mandatory===(group==='mandatory'));items.sort((a,b)=>{if(key==='completion_rate')return (a[key]??2)-(b[key]??2);return (b[key]??b.status_counts[key])-(a[key]??a.status_counts[key])||a.title.localeCompare(b.title)});$('#activities').innerHTML=items.map(i=>`<tr><td>${esc(i.title)}<small>${esc(i.event_id)} · ${esc(i.type)}</small></td><td>${esc(i.format)}</td><td>${i.employees_count} / ${i.total_records}</td>${['completed','in_progress','dropped','no_show','declined','overdue'].map(key=>'<td>'+i.status_counts[key]+'</td>').join('')}<td title="${i.status_counts.completed} / ${i.completed_outcomes} завершённых исходов">${pct(i.completion_rate)}</td><td>${avg(i.average_feedback_rating)} / ${avg(i.average_score)}</td><td>${i.assigned_by_counts.self} / ${i.assigned_by_counts.manager} / ${i.assigned_by_counts.hr}</td></tr>`).join('')||empty('Активности не найдены.',12)}
+$('#skill-sort').addEventListener('change',renderSkills);$('#activity-sort').addEventListener('change',renderActivities);document.querySelectorAll('[data-group]').forEach(button=>button.addEventListener('click',()=>{group=button.dataset.group;document.querySelectorAll('[data-group]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));renderActivities()}));
+function openDialog(title,html){$('#dialog-title').textContent=title;$('#dialog-content').innerHTML=html;if(!$('#details').open)$('#details').showModal();$('#dialog-content').scrollTop=0}
+$('#close-dialog').addEventListener('click',()=>{profileController?.abort();$('#details').close()});$('#details').addEventListener('cancel',()=>profileController?.abort());
+document.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',()=>{if(!data)return;switch(button.dataset.action){case 'all':openDialog('Сотрудники',employeeTable(data.employees));break;case 'critical':openDialog('С критическим разрывом',employeeTable(data.employees.filter(e=>e.critical_gaps.length)));break;default:$('#'+button.dataset.action+'-section').scrollIntoView({behavior:'smooth'})}}));
+async function openProfile(id){profileController?.abort();profileController=new AbortController();const signal=profileController.signal;openDialog('Профиль сотрудника','Загрузка…');try{await api('/api/hr/session',{signal});const profile=await api('/api/employees/'+encodeURIComponent(id),{signal});const employee=profile.employee,target=profile.target_role_profile;const required=profile.skill_gaps.reduce((a,g)=>a+g.target_level,0),achieved=profile.skill_gaps.reduce((a,g)=>a+Math.min(g.current_level,g.target_level),0);const skillTable=items=>'<table><thead><tr><th>Навык</th><th>Уровень / цель</th><th>Разрыв</th></tr></thead><tbody>'+items.map(g=>`<tr><td>${esc(g.name)}${g.is_critical?' <span class="badge">Критичный</span>':''}</td><td>${g.level} / ${g.target_level}</td><td>${g.gap}</td></tr>`).join('')+'</tbody></table>';openDialog(employee.full_name,`<p>${esc(employee.employee_id)} · ${esc(employee.department)}</p><div class="trajectory"><strong>${esc(employee.role)} · ${esc(employee.grade)} → ${target?esc(target.role)+' · '+esc(target.grade):'Цель не определена'}</strong>${target?`<p>Соответствие требованиям по навыкам: ${pct(required?achieved/required:1)}</p><progress max="${required||1}" value="${required?achieved:1}"></progress>`:''}</div><div class="profile-grid"><div><h3>Hard skills</h3>${skillTable(profile.skills.hard)}</div><div><h3>Soft skills</h3>${skillTable(profile.skills.soft)}</div></div><h3>Доступные полезные шаги</h3>${profile.next_steps.map(item=>`<div class="next-step"><strong>${esc(item.title)}</strong><p class="note">${item.improved_skills.map(g=>`${esc(g.name)}: ${g.current_level} → ${g.projected_level} (цель ${g.target_level})`).join('; ')}</p></div>`).join('')||'<p class="muted">Полезных доступных шагов нет.</p>'}<h3>История участия</h3><div class="scroll"><table><thead><tr><th>Активность</th><th>Дата</th><th>Статус</th><th>Выполнение</th></tr></thead><tbody>${[...profile.activity_history].reverse().map(r=>`<tr><td>${esc(r.event_title||r.event_id)}</td><td>${esc(r.date)}</td><td>${esc(statusInfo[r.status]?.[0]||r.status)}</td><td>${r.completion_pct}%</td></tr>`).join('')||empty('Истории нет.',4)}</tbody></table></div>`)}catch(error){if(error.name!=='AbortError'&&!$('#dashboard').hidden)openDialog('Ошибка',`<p class="error">${esc(error.message)}</p>`)}}
+document.addEventListener('click',e=>{const link=e.target.closest('[data-employee]');if(link){e.preventDefault();openProfile(link.dataset.employee);return}const row=e.target.closest('tr[data-profile-row]');if(row&&!e.target.closest('a,button,details'))openProfile(row.dataset.profileRow)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!$('#dashboard').hidden)load()});
+api('/api/hr/session').then(showDashboard).catch(showLogin);
+</script>
+</body></html>

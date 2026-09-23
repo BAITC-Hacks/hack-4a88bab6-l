@@ -3,18 +3,20 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 from . import recommendation_engine
+from .hr import build_hr_summary
+from .auth import router as auth_router, require_hr
 from .dataset import Dataset, DatasetError, dataset_from_bytes, load_dataset, validate_references
 from .models import RecommendationsDocument
 from .service import (
     development_activities_for_skill,
     effective_skill_levels,
-    eligible_events,
+    recommendation_candidates,
     history_for_employee,
     recommendation_context,
     record_completion,
@@ -29,6 +31,7 @@ DATABASE_PATH = Path(os.getenv("DATABASE_PATH", ROOT_DIR / "backend" / "data" / 
 HR_DASHBOARD_PATH = Path(__file__).resolve().parents[1] / "static" / "hr.html"
 
 app = FastAPI(title="Career Quest API", version="0.1.0")
+app.include_router(auth_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -114,7 +117,8 @@ def get_employee(employee_id: str, request: Request) -> dict:
     levels = effective_skill_levels(employee, dataset.events_by_id, history)
     target_profile, target_source = target_profile_for(employee, dataset)
     gaps = skill_gap_vector(employee, dataset, levels)
-    candidates = eligible_events(employee, dataset, history, levels)
+    next_steps = recommendation_candidates(employee, dataset, history, levels)
+    candidates = [dataset.events_by_id[item["event_id"]] for item in next_steps]
     for gap in gaps:
         gap["development_activities"] = development_activities_for_skill(
             gap["skill_id"], gap["current_level"], gap["gap"], candidates
@@ -150,6 +154,7 @@ def get_employee(employee_id: str, request: Request) -> dict:
         },
         "skill_gaps": gaps,
         "activity_history": _history_with_titles(dataset, employee_id),
+        "next_steps": next_steps,
     }
 
 
@@ -178,7 +183,7 @@ def get_recommendations(employee_id: str, request: Request) -> dict:
             detail={"message": "Модуль рекомендаций вернул данные неверного формата", "errors": exc.errors()},
         ) from exc
 
-    eligible_ids = {event["event_id"] for event in context["eligible_events"]}
+    eligible_ids = {event["event_id"] for event in context["recommendation_candidates"]}
     unknown_ids = [item.event_id for item in response.recommendations if item.event_id not in eligible_ids]
     if unknown_ids:
         raise HTTPException(
@@ -228,101 +233,16 @@ def complete_activity(employee_id: str, event_id: str, request: Request) -> dict
     }
 
 
-@app.get("/api/hr/summary")
-def hr_summary(request: Request) -> dict:
-    dataset = get_dataset(request)
-    gap_totals: dict[str, dict] = {}
-    participation: dict[str, int] = {}
-    no_eligible_events = []
-    employees_without_recommended_step = []
-
-    for employee in dataset.employees:
-        history = history_for_employee(dataset, activity_store, employee.employee_id)
-        levels = effective_skill_levels(employee, dataset.events_by_id, history)
-        gaps = skill_gap_vector(employee, dataset, levels)
-        positive_gaps = [gap for gap in gaps if gap["gap"] > 0]
-        for gap in positive_gaps:
-            summary = gap_totals.setdefault(
-                gap["skill_id"],
-                {"skill_id": gap["skill_id"], "name": gap["name"], "type": gap["type"],
-                 "employees_with_gap": 0, "total_gap_levels": 0, "critical_for_count": 0},
-            )
-            summary["employees_with_gap"] += 1
-            summary["total_gap_levels"] += gap["gap"]
-            summary["critical_for_count"] += int(gap["is_critical"])
-        eligible = eligible_events(employee, dataset, history, levels)
-        if not eligible:
-            no_eligible_events.append(
-                {"employee_id": employee.employee_id, "full_name": employee.full_name}
-            )
-
-        gap_ids = {gap["skill_id"] for gap in positive_gaps}
-        can_close_gap = any(
-            development.skill_id in gap_ids
-            and max(
-                levels.get(development.skill_id, 0),
-                min(levels.get(development.skill_id, 0) + development.gain, development.max_level),
-            ) > levels.get(development.skill_id, 0)
-            for event in eligible
-            for development in event.develops_skills
-        )
-        if not can_close_gap:
-            if target_profile_for(employee, dataset)[0] is None:
-                reason = "no_target_role_profile"
-            elif not positive_gaps:
-                reason = "no_positive_skill_gaps"
-            else:
-                reason = "no_eligible_activity_closes_a_skill_gap"
-            employees_without_recommended_step.append(
-                {
-                    "employee_id": employee.employee_id,
-                    "full_name": employee.full_name,
-                    "role": employee.role,
-                    "grade": employee.grade,
-                    "reason": reason,
-                }
-            )
-
-    participation_by_activity = {
-        event.event_id: {
-            "event_id": event.event_id,
-            "title": event.title,
-            "total_records": 0,
-            "employees_count": 0,
-            "status_counts": {},
-        }
-        for event in dataset.events
-    }
-    participants_by_event: dict[str, set[str]] = {}
-    all_records = list(dataset.history)
-    for employee in dataset.employees:
-        all_records.extend(activity_store.list_for_employee(employee.employee_id))
-    for record in all_records:
-        participation[record.status] = participation.get(record.status, 0) + 1
-        activity = participation_by_activity.get(record.event_id)
-        if activity is None:
-            continue
-        activity["total_records"] += 1
-        status_counts = activity["status_counts"]
-        status_counts[record.status] = status_counts.get(record.status, 0) + 1
-        participants_by_event.setdefault(record.event_id, set()).add(record.employee_id)
-    for event_id, employee_ids in participants_by_event.items():
-        participation_by_activity[event_id]["employees_count"] = len(employee_ids)
-
-    skills = sorted(
-        gap_totals.values(),
-        key=lambda item: (-item["employees_with_gap"], -item["total_gap_levels"], item["name"]),
-    )
-    return {
-        "employees_count": len(dataset.employees),
-        "skills_with_most_gaps": skills,
-        "participation_by_status": participation,
-        "participation_by_activity": sorted(
-            participation_by_activity.values(), key=lambda item: item["title"]
-        ),
-        "employees_without_recommended_step": employees_without_recommended_step,
-        "employees_without_eligible_events": no_eligible_events,
-    }
+@app.get("/api/hr/summary", dependencies=[Depends(require_hr)])
+def hr_summary(
+    request: Request,
+    department: str | None = None,
+    role: str | None = None,
+    grade: str | None = None,
+    critical_only: bool = False,
+) -> dict:
+    return build_hr_summary(get_dataset(request), activity_store, department=department,
+                            role=role, grade=grade, critical_only=critical_only)
 
 
 def _merge_items(existing: list, incoming: list, key_fn, label: str) -> tuple[list, int]:
