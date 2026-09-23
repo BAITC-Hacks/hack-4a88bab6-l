@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Career Quest — HR view</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, Segoe UI, Arial, sans-serif; color: #172033; background: #f4f6fb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { padding: 28px max(24px, calc((100% - 1200px) / 2)); background: #172554; color: white; }
+    header h1 { margin: 0 0 6px; font-size: 25px; }
+    header p { margin: 0; color: #c7d2fe; }
+    main { max-width: 1200px; margin: 24px auto; padding: 0 20px 40px; }
+    .metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
+    .metric, section { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 2px 8px #1725540a; }
+    .metric { padding: 18px 20px; }
+    .metric span { display: block; color: #64748b; font-size: 14px; }
+    .metric strong { display: block; margin-top: 6px; font-size: 30px; }
+    section { margin-top: 18px; overflow: hidden; }
+    section h2 { margin: 0; padding: 16px 18px; font-size: 18px; border-bottom: 1px solid #e2e8f0; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid #edf0f5; vertical-align: top; }
+    th { color: #64748b; font-weight: 600; background: #fafbfe; white-space: nowrap; }
+    tr:last-child td { border-bottom: 0; }
+    .badge { display: inline-block; border-radius: 999px; padding: 3px 8px; background: #eef2ff; color: #3730a3; white-space: nowrap; }
+    .empty { padding: 20px; color: #64748b; }
+    #status { margin: 16px 0; color: #64748b; }
+    #status.error { color: #b91c1c; }
+    @media (max-width: 600px) { .metrics { grid-template-columns: 1fr; } header { padding: 22px 20px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Career Quest · HR view</h1>
+    <p>Навыковые разрывы, участие в активностях и сотрудники без подходящего следующего шага</p>
+  </header>
+  <main>
+    <div id="status">Загружаю HR-сводку…</div>
+    <div class="metrics">
+      <div class="metric"><span>Сотрудников в датасете</span><strong id="employees-count">—</strong></div>
+      <div class="metric"><span>Без подходящего следующего шага</span><strong id="no-step-count">—</strong></div>
+    </div>
+    <section>
+      <h2>Навыки с наиболее частыми разрывами</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Навык</th><th>Тип</th><th>Сотрудников с разрывом</th><th>Сумма уровней разрыва</th><th>Критичный для роли</th></tr></thead>
+        <tbody id="gaps"></tbody>
+      </table></div>
+    </section>
+    <section>
+      <h2>Участие по активностям</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Активность</th><th>Участников</th><th>Записей</th><th>Завершено</th><th>В процессе</th><th>Пропуски / отказ</th></tr></thead>
+        <tbody id="participation"></tbody>
+      </table></div>
+    </section>
+    <section>
+      <h2>Сотрудники без подходящего следующего шага</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Сотрудник</th><th>Роль</th><th>Грейд</th><th>Причина</th></tr></thead>
+        <tbody id="no-step"></tbody>
+      </table></div>
+    </section>
+  </main>
+  <script>
+    const escapeHtml = value => String(value ?? "—").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    const rows = (items, render, empty) => items.length ? items.map(render).join("") : `<tr><td class="empty" colspan="8">${empty}</td></tr>`;
+    const reasonLabels = {
+      no_target_role_profile: "Нет целевого профиля роли/грейда",
+      no_positive_skill_gaps: "Нет положительных разрывов навыков",
+      no_eligible_activity_closes_a_skill_gap: "Нет доступной активности, закрывающей разрыв",
+    };
+    async function loadSummary() {
+      const status = document.querySelector("#status");
+      try {
+        const response = await fetch("/api/hr/summary");
+        if (!response.ok) throw new Error(`API вернул HTTP ${response.status}`);
+        const data = await response.json();
+        document.querySelector("#employees-count").textContent = data.employees_count;
+        document.querySelector("#no-step-count").textContent = data.employees_without_recommended_step.length;
+        document.querySelector("#gaps").innerHTML = rows(data.skills_with_most_gaps, item =>
+          `<tr><td>${escapeHtml(item.name)}</td><td><span class="badge">${escapeHtml(item.type)}</span></td><td>${item.employees_with_gap}</td><td>${item.total_gap_levels}</td><td>${item.critical_for_count}</td></tr>`,
+          "Навыковые разрывы не найдены.");
+        document.querySelector("#participation").innerHTML = rows(data.participation_by_activity, item => {
+          const counts = item.status_counts || {};
+          const missed = (counts.no_show || 0) + (counts.declined || 0) + (counts.dropped || 0) + (counts.overdue || 0);
+          return `<tr><td>${escapeHtml(item.title)}</td><td>${item.employees_count}</td><td>${item.total_records}</td><td>${counts.completed || 0}</td><td>${counts.in_progress || 0}</td><td>${missed}</td></tr>`;
+        }, "Активности не найдены.");
+        document.querySelector("#no-step").innerHTML = rows(data.employees_without_recommended_step, item =>
+          `<tr><td>${escapeHtml(item.full_name)}</td><td>${escapeHtml(item.role)}</td><td>${escapeHtml(item.grade)}</td><td>${escapeHtml(reasonLabels[item.reason] || item.reason)}</td></tr>`,
+          "У всех сотрудников есть подходящий следующий шаг.");
+        status.textContent = "Сводка обновлена из текущего датасета.";
+      } catch (error) {
+        status.textContent = `Не удалось загрузить HR-сводку: ${error.message}`;
+        status.classList.add("error");
+      }
+    }
+    loadSummary();
+  </script>
+</body>
+</html>

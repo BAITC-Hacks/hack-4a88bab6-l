@@ -31,13 +31,14 @@ The API docs are at `http://127.0.0.1:8000/docs`. By default, the data folder is
 
 | Method | Route | Purpose |
 |---|---|---|
+| GET | `/hr` | Simple Russian-language HR dashboard page |
 | GET | `/api/health` | Dataset load status and validation error, if any |
 | GET | `/api/employees` | Employee list for the UI |
 | GET | `/api/employees/{employee_id}` | Profile, hard/soft skill values, target gaps with activities that can raise each skill, and activity history |
 | GET | `/api/employees/{employee_id}/recommendation-context` | Agreed input payload for the recommendation module |
 | GET | `/api/employees/{employee_id}/recommendations` | Returns up to 3 OpenAI-ranked activities, each with at least 3 distinct evidence factors |
 | POST | `/api/employees/{employee_id}/activities/{event_id}/complete` | Saves completion and returns recalculated skill levels |
-| GET | `/api/hr/summary` | Skill gaps, participation counts, and employees with no eligible activities |
+| GET | `/api/hr/summary` | HR dashboard data: most common skill gaps, participation per activity/status, and employees without a skill-relevant next step |
 | POST | `/api/data/import` | Validates and additively imports a matching four-file dataset bundle |
 
 Import multipart field names: `employees_file`, `events_file`, `skills_file`, `history_file`. Existing records with the same ID and identical contents are ignored; conflicting IDs reject the entire import. References are validated after merging.
@@ -73,6 +74,8 @@ The OpenAI module in `app/recommendation_engine.py` selects activities. The endp
 ```
 
 Every recommendation must refer to an eligible event and include at least three different explanation factors (`grade_gap`, `skill_gap`, `participation_history`, `next_grade_requirements`). The service sends only the minimum career context needed to rank activities; it omits employee name, ID, manager, and other unused profile fields. If no eligible activity can improve a target skill, the endpoint returns an empty list without calling OpenAI.
+
+The HR summary reports skill-gap prevalence, participation grouped by activity and status, and employees for whom no eligible activity can currently raise a skill with a positive target gap. This last list is computed from the catalog without making OpenAI calls; it means there is no available skill-relevant next step, not that an AI recommendation request was previously run.
 
 ## Data handling notes
 

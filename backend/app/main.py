@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
@@ -25,6 +26,7 @@ from .store import ActivityStore
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATASET_DIR = Path(os.getenv("DATASET_DIR", ROOT_DIR / "career_quest_dataset"))
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", ROOT_DIR / "backend" / "data" / "career_quest.sqlite3"))
+HR_DASHBOARD_PATH = Path(__file__).resolve().parents[1] / "static" / "hr.html"
 
 app = FastAPI(title="Career Quest API", version="0.1.0")
 app.add_middleware(
@@ -79,6 +81,11 @@ def health(request: Request) -> dict:
         "dataset_loaded": dataset is not None,
         "dataset_error": request.app.state.dataset_error,
     }
+
+
+@app.get("/hr", include_in_schema=False)
+def hr_dashboard() -> FileResponse:
+    return FileResponse(HR_DASHBOARD_PATH, media_type="text/html; charset=utf-8")
 
 
 @app.get("/api/employees")
@@ -227,13 +234,14 @@ def hr_summary(request: Request) -> dict:
     gap_totals: dict[str, dict] = {}
     participation: dict[str, int] = {}
     no_eligible_events = []
+    employees_without_recommended_step = []
 
     for employee in dataset.employees:
         history = history_for_employee(dataset, activity_store, employee.employee_id)
         levels = effective_skill_levels(employee, dataset.events_by_id, history)
-        for gap in skill_gap_vector(employee, dataset, levels):
-            if gap["gap"] <= 0:
-                continue
+        gaps = skill_gap_vector(employee, dataset, levels)
+        positive_gaps = [gap for gap in gaps if gap["gap"] > 0]
+        for gap in positive_gaps:
             summary = gap_totals.setdefault(
                 gap["skill_id"],
                 {"skill_id": gap["skill_id"], "name": gap["name"], "type": gap["type"],
@@ -242,16 +250,64 @@ def hr_summary(request: Request) -> dict:
             summary["employees_with_gap"] += 1
             summary["total_gap_levels"] += gap["gap"]
             summary["critical_for_count"] += int(gap["is_critical"])
-        if not eligible_events(employee, dataset, history, levels):
+        eligible = eligible_events(employee, dataset, history, levels)
+        if not eligible:
             no_eligible_events.append(
                 {"employee_id": employee.employee_id, "full_name": employee.full_name}
             )
 
-    for record in dataset.history:
-        participation[record.status] = participation.get(record.status, 0) + 1
+        gap_ids = {gap["skill_id"] for gap in positive_gaps}
+        can_close_gap = any(
+            development.skill_id in gap_ids
+            and max(
+                levels.get(development.skill_id, 0),
+                min(levels.get(development.skill_id, 0) + development.gain, development.max_level),
+            ) > levels.get(development.skill_id, 0)
+            for event in eligible
+            for development in event.develops_skills
+        )
+        if not can_close_gap:
+            if target_profile_for(employee, dataset)[0] is None:
+                reason = "no_target_role_profile"
+            elif not positive_gaps:
+                reason = "no_positive_skill_gaps"
+            else:
+                reason = "no_eligible_activity_closes_a_skill_gap"
+            employees_without_recommended_step.append(
+                {
+                    "employee_id": employee.employee_id,
+                    "full_name": employee.full_name,
+                    "role": employee.role,
+                    "grade": employee.grade,
+                    "reason": reason,
+                }
+            )
+
+    participation_by_activity = {
+        event.event_id: {
+            "event_id": event.event_id,
+            "title": event.title,
+            "total_records": 0,
+            "employees_count": 0,
+            "status_counts": {},
+        }
+        for event in dataset.events
+    }
+    participants_by_event: dict[str, set[str]] = {}
+    all_records = list(dataset.history)
     for employee in dataset.employees:
-        for record in activity_store.list_for_employee(employee.employee_id):
-            participation[record.status] = participation.get(record.status, 0) + 1
+        all_records.extend(activity_store.list_for_employee(employee.employee_id))
+    for record in all_records:
+        participation[record.status] = participation.get(record.status, 0) + 1
+        activity = participation_by_activity.get(record.event_id)
+        if activity is None:
+            continue
+        activity["total_records"] += 1
+        status_counts = activity["status_counts"]
+        status_counts[record.status] = status_counts.get(record.status, 0) + 1
+        participants_by_event.setdefault(record.event_id, set()).add(record.employee_id)
+    for event_id, employee_ids in participants_by_event.items():
+        participation_by_activity[event_id]["employees_count"] = len(employee_ids)
 
     skills = sorted(
         gap_totals.values(),
@@ -261,6 +317,10 @@ def hr_summary(request: Request) -> dict:
         "employees_count": len(dataset.employees),
         "skills_with_most_gaps": skills,
         "participation_by_status": participation,
+        "participation_by_activity": sorted(
+            participation_by_activity.values(), key=lambda item: item["title"]
+        ),
+        "employees_without_recommended_step": employees_without_recommended_step,
         "employees_without_eligible_events": no_eligible_events,
     }
 
