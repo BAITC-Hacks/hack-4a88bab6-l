@@ -27,9 +27,7 @@ coverage/
 runtime/
 .DS_Store
 
-# Organizer materials stay inside the authorized hackathon environment.
-career_quest_dataset/
-career_quest_dataset.zip
+# Local reference packs
 career_quest_codex_pack.zip
 references/
 CAREER_QUEST_CODEX_PROMPT.md
