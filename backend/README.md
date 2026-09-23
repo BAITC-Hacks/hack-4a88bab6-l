@@ -1,5 +1,7 @@
 # Career Quest API
 
+For the team's Russian-language setup guide, including Windows startup when PowerShell scripts are disabled, see the [root README](../README.md). This file describes the backend contract in more detail.
+
 Python/FastAPI backend for the Career Quest demo. It loads the checked-in dataset, validates its structure and references, exposes employee/HR data, generates grounded activity recommendations through the OpenAI API, and saves completed development activities to SQLite.
 
 ## Run locally

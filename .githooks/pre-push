@@ -1,0 +1,31 @@
+#!/bin/sh
+# Every update to main must include a meaningful README.md update.
+# This hook checks the file diff; reviewers and authors check its substance.
+while read -r local_ref local_oid remote_ref remote_oid
+do
+    [ "$remote_ref" = "refs/heads/main" ] || continue
+    # A deleted ref has an all-zero local object ID.
+    case "$local_oid" in *[!0]*) ;; *) continue ;; esac
+    if ! git cat-file -e "${local_oid}:README.md" 2>/dev/null; then
+        echo "Push to main blocked: root README.md must exist." >&2
+        exit 1
+    fi
+    # New main: there is no earlier README to compare against.
+    case "$remote_oid" in *[!0]*) ;; *) continue ;; esac
+    if ! git cat-file -e "${remote_oid}^{commit}" 2>/dev/null; then
+        echo "Push to main blocked: run git fetch origin, then review the current main." >&2
+        exit 1
+    fi
+    git diff --quiet "$remote_oid" "$local_oid" -- README.md
+    diff_status=$?
+    if [ "$diff_status" -eq 0 ]; then
+        echo "Push to main blocked: update and commit README.md for this release." >&2
+        echo "Describe the changed behavior, setup/API changes, and validation results." >&2
+        exit 1
+    fi
+    if [ "$diff_status" -ne 1 ]; then
+        echo "Push to main blocked: could not compare README.md." >&2
+        exit 1
+    fi
+done
+exit 0
